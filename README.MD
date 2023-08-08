@@ -20,8 +20,16 @@ tower_allowed_hosts = "0.1.0"
 
 # Usage
 
+To use non regex based hosts you can use
+
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(vec![regex::Regex::new("^127.0.0.1$")]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(vec!["127.0.0.1"]);
+```
+
+If you need to use regex based host matching you need to enable `regex` feature for crate than you can use
+
+```rust
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::new_regex(vec![regex::Regex::new("^127.0.0.1$")]);
 ```
 
 [license_badge]: https://img.shields.io/github/license/iamsauravsharma/tower_allowed_hosts.svg?style=for-the-badge
