@@ -212,7 +212,7 @@ where
                 .iter()
                 .any(|reg| reg.is_match(&host));
 
-        if domain_match {
+        if !domain_match {
             let err = Box::new(Error::HostNotAllowed);
             return Poll::Ready(Err(err));
         }
