@@ -37,7 +37,7 @@ pub enum Error {
 /// - `X-Forwarded-Host` header
 /// - `Host` header
 /// - request target / URI
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AllowedHostLayer {
     allowed_hosts: Vec<String>,
     #[cfg(feature = "regex")]
@@ -46,6 +46,11 @@ pub struct AllowedHostLayer {
 
 impl AllowedHostLayer {
     /// Create new allowed hosts layer
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new(&["127.0.0.1".to_string()]);
+    /// ```
     #[must_use]
     pub fn new(allowed_hosts: &[String]) -> Self {
         Self {
@@ -56,6 +61,12 @@ impl AllowedHostLayer {
     }
 
     /// Create new allowed hosts layer with regex
+    ///
+    /// ```rust
+    /// use regex::Regex;
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new_regex(&[Regex::new("^127.0.0.1$").unwrap()]);
+    /// ```
     #[must_use]
     #[cfg(feature = "regex")]
     pub fn new_regex(allowed_hosts_regex: &[Regex]) -> Self {
@@ -65,7 +76,17 @@ impl AllowedHostLayer {
         }
     }
 
-    /// Create new allowed hosts layer with regex
+    /// Create new allowed hosts layer with both regex list as well as simple
+    /// list
+    ///
+    /// ```rust
+    /// use regex::Regex;
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new_both(
+    ///     &["127.0.0.1".to_string()],
+    ///     &[Regex::new("^127.0.0.1$").unwrap()],
+    /// );
+    /// ```
     #[must_use]
     #[cfg(feature = "regex")]
     pub fn new_both(allowed_hosts: &[String], allowed_hosts_regex: &[Regex]) -> Self {
@@ -75,14 +96,25 @@ impl AllowedHostLayer {
         }
     }
 
-    /// Extend allowed hosts
+    /// Extend allowed hosts list
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::default().with_host("127.0.0.1".to_string());
+    /// ```
     #[must_use]
     pub fn with_host(mut self, regex: String) -> Self {
         self.allowed_hosts.push(regex);
         self
     }
 
-    /// Extend allowed hosts with regex
+    /// Extend allowed hosts regex list
+    ///
+    /// ```rust
+    /// use regex::Regex;
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::default().with_regex_host(Regex::new("^127.0.0.1$").unwrap());
+    /// ```
     #[must_use]
     #[cfg(feature = "regex")]
     pub fn with_regex_host(mut self, regex: Regex) -> Self {
