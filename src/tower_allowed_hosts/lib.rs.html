@@ -471,7 +471,7 @@
                 .iter()
                 .any(|reg| reg.is_match(<span class="kw-2">&amp;</span>host));
 
-        <span class="kw">if </span>domain_match {
+        <span class="kw">if </span>!domain_match {
             <span class="kw">let </span>err = Box::new(Error::HostNotAllowed);
             <span class="kw">return </span>Poll::Ready(<span class="prelude-val">Err</span>(err));
         }
