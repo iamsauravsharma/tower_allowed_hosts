@@ -18,3 +18,7 @@ tower = "0.4.13"
 
 [features]
 regex = ["dep:regex"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
