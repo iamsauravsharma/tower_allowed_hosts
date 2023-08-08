@@ -39,3 +39,4 @@ jobs:
       - name: Run tests
         run: |
           cargo make full
+          cargo make --env FEATURES_FLAG="--features regex" full

@@ -12,6 +12,7 @@ use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
 use http::{HeaderMap, Request, Response, Uri};
+#[cfg(feature = "regex")]
 use regex::Regex;
 use tower::{BoxError, Layer, Service};
 
@@ -38,16 +39,55 @@ pub enum Error {
 /// - request target / URI
 #[derive(Clone)]
 pub struct AllowedHostLayer {
-    allowed_hosts: Vec<Regex>,
+    allowed_hosts: Vec<String>,
+    #[cfg(feature = "regex")]
+    allowed_hosts_regex: Vec<Regex>,
 }
 
 impl AllowedHostLayer {
     /// Create new allowed hosts layer
     #[must_use]
-    pub fn new(allowed_hosts: &[Regex]) -> Self {
+    pub fn new(allowed_hosts: &[String]) -> Self {
         Self {
             allowed_hosts: allowed_hosts.to_vec(),
+            #[cfg(feature = "regex")]
+            allowed_hosts_regex: vec![],
         }
+    }
+
+    /// Create new allowed hosts layer with regex
+    #[must_use]
+    #[cfg(feature = "regex")]
+    pub fn new_regex(allowed_hosts_regex: &[Regex]) -> Self {
+        Self {
+            allowed_hosts: vec![],
+            allowed_hosts_regex: allowed_hosts_regex.to_vec(),
+        }
+    }
+
+    /// Create new allowed hosts layer with regex
+    #[must_use]
+    #[cfg(feature = "regex")]
+    pub fn new_both(allowed_hosts: &[String], allowed_hosts_regex: &[Regex]) -> Self {
+        Self {
+            allowed_hosts: allowed_hosts.to_vec(),
+            allowed_hosts_regex: allowed_hosts_regex.to_vec(),
+        }
+    }
+
+    /// Extend allowed hosts
+    #[must_use]
+    pub fn with_host(mut self, regex: String) -> Self {
+        self.allowed_hosts.push(regex);
+        self
+    }
+
+    /// Extend allowed hosts with regex
+    #[must_use]
+    #[cfg(feature = "regex")]
+    pub fn with_regex_host(mut self, regex: Regex) -> Self {
+        self.allowed_hosts_regex.push(regex);
+        self
     }
 }
 
@@ -57,6 +97,8 @@ impl<S> Layer<S> for AllowedHostLayer {
     fn layer(&self, inner: S) -> Self::Service {
         Self::Service {
             allowed_hosts: self.allowed_hosts.clone(),
+            #[cfg(feature = "regex")]
+            allowed_hosts_regex: self.allowed_hosts_regex.clone(),
             inner,
         }
     }
@@ -66,7 +108,9 @@ impl<S> Layer<S> for AllowedHostLayer {
 #[derive(Clone)]
 pub struct AllowedHost<S> {
     inner: S,
-    allowed_hosts: Vec<Regex>,
+    allowed_hosts: Vec<String>,
+    #[cfg(feature = "regex")]
+    allowed_hosts_regex: Vec<Regex>,
 }
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for AllowedHost<S>
 where
@@ -90,6 +134,8 @@ where
             headers,
             uri,
             allowed_hosts: self.allowed_hosts.clone(),
+            #[cfg(feature = "regex")]
+            allowed_hosts_regex: self.allowed_hosts_regex.clone(),
         }
     }
 }
@@ -104,7 +150,10 @@ pub struct AllowedHostFuture<F> {
     #[pin]
     uri: Uri,
     #[pin]
-    allowed_hosts: Vec<Regex>,
+    allowed_hosts: Vec<String>,
+    #[pin]
+    #[cfg(feature = "regex")]
+    allowed_hosts_regex: Vec<Regex>,
 }
 
 impl<F, Response, E> Future for AllowedHostFuture<F>
@@ -120,7 +169,18 @@ where
             let err = Box::new(Error::FailedToResolveHost);
             return Poll::Ready(Err(err));
         };
-        if !project.allowed_hosts.iter().any(|reg| reg.is_match(&host)) {
+        let domain_match: bool = project
+            .allowed_hosts
+            .iter()
+            .any(|allowed_host| allowed_host == &host);
+        #[cfg(feature = "regex")]
+        let domain_match = domain_match
+            || project
+                .allowed_hosts_regex
+                .iter()
+                .any(|reg| reg.is_match(&host));
+
+        if domain_match {
             let err = Box::new(Error::HostNotAllowed);
             return Poll::Ready(Err(err));
         }
