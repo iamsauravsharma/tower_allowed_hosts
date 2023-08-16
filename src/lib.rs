@@ -214,8 +214,13 @@ where
 
         if !domain_match {
             let err = Box::new(Error::HostNotAllowed);
+            #[cfg(feature = "tracing")]
+            tracing::debug!("blocked host: {host}");
             return Poll::Ready(Err(err));
         }
+        #[cfg(feature = "tracing")]
+        tracing::debug!("allowed host: {host}");
+
         match project.response_future.poll(cx) {
             Poll::Ready(result) => Poll::Ready(result.map_err(Into::into)),
             Poll::Pending => Poll::Pending,
