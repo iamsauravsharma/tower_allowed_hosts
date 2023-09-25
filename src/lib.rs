@@ -103,8 +103,8 @@ impl AllowedHostLayer {
     /// let _ = AllowedHostLayer::default().with_host("127.0.0.1".to_string());
     /// ```
     #[must_use]
-    pub fn with_host(mut self, regex: String) -> Self {
-        self.allowed_hosts.push(regex);
+    pub fn with_host(mut self, host: String) -> Self {
+        self.allowed_hosts.push(host);
         self
     }
 
