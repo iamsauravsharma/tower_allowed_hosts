@@ -20,6 +20,7 @@ const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 
 /// Enum for different error
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// error when host is failed to resolve
     #[error("failed to resolve host for server")]
