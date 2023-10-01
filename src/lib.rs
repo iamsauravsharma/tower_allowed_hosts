@@ -49,12 +49,16 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new(&["127.0.0.1".to_string()]);
+    /// let _ = AllowedHostLayer::new(["127.0.0.1"]);
     /// ```
     #[must_use]
-    pub fn new(allowed_hosts: &[String]) -> Self {
+    pub fn new<I, T>(allowed_hosts: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
         Self {
-            allowed_hosts: allowed_hosts.to_vec(),
+            allowed_hosts: allowed_hosts.into_iter().map(Into::into).collect(),
             #[cfg(feature = "regex")]
             allowed_hosts_regex: vec![],
         }
@@ -65,14 +69,17 @@ impl AllowedHostLayer {
     /// ```rust
     /// use regex::Regex;
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new_regex(&[Regex::new("^127.0.0.1$").unwrap()]);
+    /// let _ = AllowedHostLayer::new_regex(vec![Regex::new("^127.0.0.1$").unwrap()]);
     /// ```
     #[must_use]
     #[cfg(feature = "regex")]
-    pub fn new_regex(allowed_hosts_regex: &[Regex]) -> Self {
+    pub fn new_regex<I>(allowed_hosts_regex: I) -> Self
+    where
+        I: IntoIterator<Item = Regex>,
+    {
         Self {
             allowed_hosts: vec![],
-            allowed_hosts_regex: allowed_hosts_regex.to_vec(),
+            allowed_hosts_regex: allowed_hosts_regex.into_iter().collect(),
         }
     }
 
@@ -82,17 +89,19 @@ impl AllowedHostLayer {
     /// ```rust
     /// use regex::Regex;
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new_both(
-    ///     &["127.0.0.1".to_string()],
-    ///     &[Regex::new("^127.0.0.1$").unwrap()],
-    /// );
+    /// let _ = AllowedHostLayer::new_both(["127.0.0.1"], [Regex::new("^127.0.0.1$").unwrap()]);
     /// ```
     #[must_use]
     #[cfg(feature = "regex")]
-    pub fn new_both(allowed_hosts: &[String], allowed_hosts_regex: &[Regex]) -> Self {
+    pub fn new_both<I1, I2, T>(allowed_hosts: I1, allowed_hosts_regex: I2) -> Self
+    where
+        I1: IntoIterator<Item = T>,
+        T: Into<String>,
+        I2: IntoIterator<Item = Regex>,
+    {
         Self {
-            allowed_hosts: allowed_hosts.to_vec(),
-            allowed_hosts_regex: allowed_hosts_regex.to_vec(),
+            allowed_hosts: allowed_hosts.into_iter().map(Into::into).collect(),
+            allowed_hosts_regex: allowed_hosts_regex.into_iter().collect(),
         }
     }
 
@@ -100,11 +109,14 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().with_host("127.0.0.1".to_string());
+    /// let _ = AllowedHostLayer::default().with_host("127.0.0.1");
     /// ```
     #[must_use]
-    pub fn with_host(mut self, host: String) -> Self {
-        self.allowed_hosts.push(host);
+    pub fn with_host<T>(mut self, host: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.allowed_hosts.push(host.into());
         self
     }
 
