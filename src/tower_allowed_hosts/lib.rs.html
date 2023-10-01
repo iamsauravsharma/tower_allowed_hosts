@@ -274,6 +274,7 @@
 <a href="#274" id="274">274</a>
 <a href="#275" id="275">275</a>
 <a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
 </span><span class="attr">#![warn(missing_docs, unreachable_pub, unused_crate_dependencies)]
@@ -296,6 +297,7 @@
 
 <span class="doccomment">/// Enum for different error
 </span><span class="attr">#[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 </span><span class="kw">pub enum </span>Error {
     <span class="doccomment">/// error when host is failed to resolve
     </span><span class="attr">#[error(<span class="string">&quot;failed to resolve host for server&quot;</span>)]
