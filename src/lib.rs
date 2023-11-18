@@ -1,9 +1,5 @@
 //! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
-#![warn(missing_docs, unreachable_pub, unused_crate_dependencies)]
-#![deny(unsafe_code)]
-#![deny(clippy::all)]
-#![warn(clippy::pedantic)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use std::future::Future;
