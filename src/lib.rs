@@ -30,8 +30,9 @@ pub enum Error {
 /// hosts which are used to resolve server hostname is valid or not
 ///
 /// Server hostname is resolved through the following, in order:
-/// - `Forwarded` header
-/// - `X-Forwarded-Host` header
+/// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
+/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
+///   value is false)
 /// - `Host` header
 /// - request target / URI
 #[derive(Clone, Default)]
@@ -39,6 +40,8 @@ pub struct AllowedHostLayer {
     allowed_hosts: Vec<String>,
     #[cfg(feature = "regex")]
     allowed_hosts_regex: Vec<Regex>,
+    use_forwarded: bool,
+    use_x_forwarded_host: bool,
 }
 
 impl AllowedHostLayer {
@@ -56,8 +59,7 @@ impl AllowedHostLayer {
     {
         Self {
             allowed_hosts: allowed_hosts.into_iter().map(Into::into).collect(),
-            #[cfg(feature = "regex")]
-            allowed_hosts_regex: vec![],
+            ..Default::default()
         }
     }
 
@@ -75,8 +77,8 @@ impl AllowedHostLayer {
         I: IntoIterator<Item = Regex>,
     {
         Self {
-            allowed_hosts: vec![],
             allowed_hosts_regex: allowed_hosts_regex.into_iter().collect(),
+            ..Default::default()
         }
     }
 
@@ -108,6 +110,46 @@ impl AllowedHostLayer {
     pub fn extend_regex_host(mut self, regex: Regex) -> Self {
         self.allowed_hosts_regex.push(regex);
         self
+    }
+
+    /// Set `use_forwarded` to provided value. If it is set to true than
+    /// `Forwarded` header is used
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new(["127.0.0.1"]).set_use_forwarded(true);
+    /// ```
+    #[must_use]
+    pub fn set_use_forwarded(mut self, use_forwarded: bool) -> Self {
+        self.use_forwarded = use_forwarded;
+        self
+    }
+
+    /// Set `use_x_forwarded_host` to provided value. If it is set to true than
+    /// `X-Forwarded-Host` header is used
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new(["127.0.0.1"]).set_use_x_forwarded_host(true);
+    /// ```
+    #[must_use]
+    pub fn set_use_x_forwarded_host(mut self, use_x_forwarded_host: bool) -> Self {
+        self.use_x_forwarded_host = use_x_forwarded_host;
+        self
+    }
+
+    fn is_domain_allowed(&self, host: &str) -> bool {
+        let domain_match: bool = self
+            .allowed_hosts
+            .iter()
+            .any(|allowed_host| allowed_host == host);
+        #[cfg(feature = "regex")]
+        let domain_match = domain_match
+            || self
+                .allowed_hosts_regex
+                .iter()
+                .any(|reg| reg.is_match(host));
+        domain_match
     }
 }
 
@@ -176,24 +218,16 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let project = self.project();
-        let Some(host) = get_host(&project.headers, &project.uri) else {
+        let Some(host) = get_host(
+            &project.headers,
+            &project.uri,
+            project.layer.use_forwarded,
+            project.layer.use_x_forwarded_host,
+        ) else {
             let err = Box::new(Error::FailedToResolveHost);
             return Poll::Ready(Err(err));
         };
-        let domain_match: bool = project
-            .layer
-            .allowed_hosts
-            .iter()
-            .any(|allowed_host| allowed_host == &host);
-        #[cfg(feature = "regex")]
-        let domain_match = domain_match
-            || project
-                .layer
-                .allowed_hosts_regex
-                .iter()
-                .any(|reg| reg.is_match(&host));
-
-        if !domain_match {
+        if !project.layer.is_domain_allowed(&host) {
             let err = Box::new(Error::HostNotAllowed);
             #[cfg(feature = "tracing")]
             tracing::debug!("blocked host: {host}");
@@ -209,16 +243,25 @@ where
     }
 }
 
-fn get_host(headers: &HeaderMap, uri: &Uri) -> Option<String> {
-    if let Some(host) = get_forwarded_hosts(headers) {
-        return Some(host.to_string());
+fn get_host(
+    headers: &HeaderMap,
+    uri: &Uri,
+    use_forwarded: bool,
+    use_x_forwarded_host: bool,
+) -> Option<String> {
+    if use_forwarded {
+        if let Some(host) = get_forwarded_hosts(headers) {
+            return Some(host.to_string());
+        }
     }
 
-    if let Some(host) = headers
-        .get(X_FORWARDED_HOST_HEADER_KEY)
-        .and_then(|host| host.to_str().ok())
-    {
-        return Some(host.to_string());
+    if use_x_forwarded_host {
+        if let Some(host) = headers
+            .get(X_FORWARDED_HOST_HEADER_KEY)
+            .and_then(|host| host.to_str().ok())
+        {
+            return Some(host.to_string());
+        }
     }
 
     if let Some(host) = headers.get(HOST).and_then(|host| host.to_str().ok()) {
