@@ -80,36 +80,14 @@ impl AllowedHostLayer {
         }
     }
 
-    /// Create new allowed hosts layer with both regex list as well as simple
-    /// list
-    ///
-    /// ```rust
-    /// use regex::Regex;
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new_both(["127.0.0.1"], [Regex::new("^127.0.0.1$").unwrap()]);
-    /// ```
-    #[must_use]
-    #[cfg(feature = "regex")]
-    pub fn new_both<I1, I2, T>(allowed_hosts: I1, allowed_hosts_regex: I2) -> Self
-    where
-        I1: IntoIterator<Item = T>,
-        T: Into<String>,
-        I2: IntoIterator<Item = Regex>,
-    {
-        Self {
-            allowed_hosts: allowed_hosts.into_iter().map(Into::into).collect(),
-            allowed_hosts_regex: allowed_hosts_regex.into_iter().collect(),
-        }
-    }
-
     /// Extend allowed hosts list
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().with_host("127.0.0.1");
+    /// let _ = AllowedHostLayer::default().extend_host("127.0.0.1");
     /// ```
     #[must_use]
-    pub fn with_host<T>(mut self, host: T) -> Self
+    pub fn extend_host<T>(mut self, host: T) -> Self
     where
         T: Into<String>,
     {
@@ -122,11 +100,12 @@ impl AllowedHostLayer {
     /// ```rust
     /// use regex::Regex;
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().with_regex_host(Regex::new("^127.0.0.1$").unwrap());
+    /// let _ = AllowedHostLayer::new_regex(vec![Regex::new("^127.0.0.1$").unwrap()])
+    ///     .extend_regex_host(Regex::new("^localhost$").unwrap());
     /// ```
     #[must_use]
     #[cfg(feature = "regex")]
-    pub fn with_regex_host(mut self, regex: Regex) -> Self {
+    pub fn extend_regex_host(mut self, regex: Regex) -> Self {
         self.allowed_hosts_regex.push(regex);
         self
     }
