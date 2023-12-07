@@ -116,10 +116,8 @@ impl<S> Layer<S> for AllowedHostLayer {
 
     fn layer(&self, inner: S) -> Self::Service {
         Self::Service {
-            allowed_hosts: self.allowed_hosts.clone(),
-            #[cfg(feature = "regex")]
-            allowed_hosts_regex: self.allowed_hosts_regex.clone(),
             inner,
+            layer: self.clone(),
         }
     }
 }
@@ -128,9 +126,7 @@ impl<S> Layer<S> for AllowedHostLayer {
 #[derive(Clone)]
 pub struct AllowedHost<S> {
     inner: S,
-    allowed_hosts: Vec<String>,
-    #[cfg(feature = "regex")]
-    allowed_hosts_regex: Vec<Regex>,
+    layer: AllowedHostLayer,
 }
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for AllowedHost<S>
 where
@@ -153,9 +149,7 @@ where
             response_future,
             headers,
             uri,
-            allowed_hosts: self.allowed_hosts.clone(),
-            #[cfg(feature = "regex")]
-            allowed_hosts_regex: self.allowed_hosts_regex.clone(),
+            layer: self.layer.clone(),
         }
     }
 }
@@ -170,10 +164,7 @@ pub struct AllowedHostFuture<F> {
     #[pin]
     uri: Uri,
     #[pin]
-    allowed_hosts: Vec<String>,
-    #[pin]
-    #[cfg(feature = "regex")]
-    allowed_hosts_regex: Vec<Regex>,
+    layer: AllowedHostLayer,
 }
 
 impl<F, Response, E> Future for AllowedHostFuture<F>
@@ -190,12 +181,14 @@ where
             return Poll::Ready(Err(err));
         };
         let domain_match: bool = project
+            .layer
             .allowed_hosts
             .iter()
             .any(|allowed_host| allowed_host == &host);
         #[cfg(feature = "regex")]
         let domain_match = domain_match
             || project
+                .layer
                 .allowed_hosts_regex
                 .iter()
                 .any(|reg| reg.is_match(&host));
