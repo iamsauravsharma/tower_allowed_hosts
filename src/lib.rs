@@ -138,6 +138,31 @@ impl AllowedHostLayer {
         self
     }
 
+    /// Get allowed hosts
+    #[must_use]
+    pub fn allowed_hosts(&self) -> &[String] {
+        &self.allowed_hosts
+    }
+
+    /// Get allowed hosts regex
+    #[must_use]
+    #[cfg(feature = "regex")]
+    pub fn allowed_hosts_regex(&self) -> &[Regex] {
+        &self.allowed_hosts_regex
+    }
+
+    /// Get if `Forwarded` header is used to determine host
+    #[must_use]
+    pub fn use_forwarded(&self) -> bool {
+        self.use_forwarded
+    }
+
+    /// Get if `X-Forwarded-Host` header is used to determine host
+    #[must_use]
+    pub fn use_x_forwarded_host(&self) -> bool {
+        self.use_x_forwarded_host
+    }
+
     fn is_domain_allowed(&self, host: &str) -> bool {
         let domain_match: bool = self
             .allowed_hosts
