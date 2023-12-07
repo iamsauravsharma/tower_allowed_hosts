@@ -243,6 +243,49 @@
 <a href="#243" id="243">243</a>
 <a href="#244" id="244">244</a>
 <a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
 </span><span class="attr">#![cfg_attr(docsrs, feature(doc_auto_cfg))]
@@ -275,8 +318,9 @@
 /// hosts which are used to resolve server hostname is valid or not
 ///
 /// Server hostname is resolved through the following, in order:
-/// - `Forwarded` header
-/// - `X-Forwarded-Host` header
+/// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
+/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
+///   value is false)
 /// - `Host` header
 /// - request target / URI
 </span><span class="attr">#[derive(Clone, Default)]
@@ -284,6 +328,8 @@
     allowed_hosts: Vec&lt;String&gt;,
     <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
     </span>allowed_hosts_regex: Vec&lt;Regex&gt;,
+    use_forwarded: bool,
+    use_x_forwarded_host: bool,
 }
 
 <span class="kw">impl </span>AllowedHostLayer {
@@ -301,8 +347,7 @@
     {
         <span class="self">Self </span>{
             allowed_hosts: allowed_hosts.into_iter().map(Into::into).collect(),
-            <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
-            </span>allowed_hosts_regex: <span class="macro">vec!</span>[],
+            ..Default::default()
         }
     }
 
@@ -320,8 +365,8 @@
         </span>I: IntoIterator&lt;Item = Regex&gt;,
     {
         <span class="self">Self </span>{
-            allowed_hosts: <span class="macro">vec!</span>[],
             allowed_hosts_regex: allowed_hosts_regex.into_iter().collect(),
+            ..Default::default()
         }
     }
 
@@ -354,6 +399,46 @@
         <span class="self">self</span>.allowed_hosts_regex.push(regex);
         <span class="self">self
     </span>}
+
+    <span class="doccomment">/// Set `use_forwarded` to provided value. If it is set to true than
+    /// `Forwarded` header is used
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new(["127.0.0.1"]).set_use_forwarded(true);
+    /// ```
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>set_use_forwarded(<span class="kw-2">mut </span><span class="self">self</span>, use_forwarded: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.use_forwarded = use_forwarded;
+        <span class="self">self
+    </span>}
+
+    <span class="doccomment">/// Set `use_x_forwarded_host` to provided value. If it is set to true than
+    /// `X-Forwarded-Host` header is used
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::new(["127.0.0.1"]).set_use_x_forwarded_host(true);
+    /// ```
+    </span><span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>set_use_x_forwarded_host(<span class="kw-2">mut </span><span class="self">self</span>, use_x_forwarded_host: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.use_x_forwarded_host = use_x_forwarded_host;
+        <span class="self">self
+    </span>}
+
+    <span class="kw">fn </span>is_domain_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, host: <span class="kw-2">&amp;</span>str) -&gt; bool {
+        <span class="kw">let </span>domain_match: bool = <span class="self">self
+            </span>.allowed_hosts
+            .iter()
+            .any(|allowed_host| allowed_host == host);
+        <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
+        </span><span class="kw">let </span>domain_match = domain_match
+            || <span class="self">self
+                </span>.allowed_hosts_regex
+                .iter()
+                .any(|reg| reg.is_match(host));
+        domain_match
+    }
 }
 
 <span class="kw">impl</span>&lt;S&gt; Layer&lt;S&gt; <span class="kw">for </span>AllowedHostLayer {
@@ -421,24 +506,16 @@
 
     <span class="kw">fn </span>poll(<span class="self">self</span>: Pin&lt;<span class="kw-2">&amp;mut </span><span class="self">Self</span>&gt;, cx: <span class="kw-2">&amp;mut </span>Context&lt;<span class="lifetime">'_</span>&gt;) -&gt; Poll&lt;<span class="self">Self</span>::Output&gt; {
         <span class="kw">let </span>project = <span class="self">self</span>.project();
-        <span class="kw">let </span><span class="prelude-val">Some</span>(host) = get_host(<span class="kw-2">&amp;</span>project.headers, <span class="kw-2">&amp;</span>project.uri) <span class="kw">else </span>{
+        <span class="kw">let </span><span class="prelude-val">Some</span>(host) = get_host(
+            <span class="kw-2">&amp;</span>project.headers,
+            <span class="kw-2">&amp;</span>project.uri,
+            project.layer.use_forwarded,
+            project.layer.use_x_forwarded_host,
+        ) <span class="kw">else </span>{
             <span class="kw">let </span>err = Box::new(Error::FailedToResolveHost);
             <span class="kw">return </span>Poll::Ready(<span class="prelude-val">Err</span>(err));
         };
-        <span class="kw">let </span>domain_match: bool = project
-            .layer
-            .allowed_hosts
-            .iter()
-            .any(|allowed_host| allowed_host == <span class="kw-2">&amp;</span>host);
-        <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
-        </span><span class="kw">let </span>domain_match = domain_match
-            || project
-                .layer
-                .allowed_hosts_regex
-                .iter()
-                .any(|reg| reg.is_match(<span class="kw-2">&amp;</span>host));
-
-        <span class="kw">if </span>!domain_match {
+        <span class="kw">if </span>!project.layer.is_domain_allowed(<span class="kw-2">&amp;</span>host) {
             <span class="kw">let </span>err = Box::new(Error::HostNotAllowed);
             <span class="attr">#[cfg(feature = <span class="string">"tracing"</span>)]
             </span><span class="macro">tracing::debug!</span>(<span class="string">"blocked host: {host}"</span>);
@@ -454,16 +531,25 @@
     }
 }
 
-<span class="kw">fn </span>get_host(headers: <span class="kw-2">&amp;</span>HeaderMap, uri: <span class="kw-2">&amp;</span>Uri) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = get_forwarded_hosts(headers) {
-        <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
+<span class="kw">fn </span>get_host(
+    headers: <span class="kw-2">&amp;</span>HeaderMap,
+    uri: <span class="kw-2">&amp;</span>Uri,
+    use_forwarded: bool,
+    use_x_forwarded_host: bool,
+) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+    <span class="kw">if </span>use_forwarded {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = get_forwarded_hosts(headers) {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
+        }
     }
 
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = headers
-        .get(X_FORWARDED_HOST_HEADER_KEY)
-        .and_then(|host| host.to_str().ok())
-    {
-        <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
+    <span class="kw">if </span>use_x_forwarded_host {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = headers
+            .get(X_FORWARDED_HOST_HEADER_KEY)
+            .and_then(|host| host.to_str().ok())
+        {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
+        }
     }
 
     <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = headers.get(HOST).and_then(|host| host.to_str().ok()) {
