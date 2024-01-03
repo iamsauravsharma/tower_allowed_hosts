@@ -32,6 +32,39 @@ If you need to use regex based host matching you need to enable `regex` feature 
 let tower_layer = tower_allowed_hosts::AllowedHostLayer::new_regex(&[regex::Regex::new("^127.0.0.1$")?]);
 ```
 
+After creation of layer you can use layer in library which supports tower as component
+
+For example to use tower allowed hosts in axum you also needs to add HandleErrorLayer so error gets handled properly
+
+```rust
+use axum::{
+    error_handling::HandleErrorLayer,
+    http::StatusCode,
+    Router
+};
+use tower::ServiceBuilder;
+use tower_allowed_hosts::AllowedHostLayer;
+
+fn router() -> Router {
+    let handle_error_layer = HandleErrorLayer::new(handle_box_error);
+
+    let allowed_hosts_layer = AllowedHostLayer::new_regex(&[regex::Regex::new("^127.0.0.1$")?]);
+
+     let layer = ServiceBuilder::new()
+        .layer(handle_error_layer)
+        .layer(allowed_hosts_layer);
+
+    Router::new().layer(layer)
+}
+
+async fn handle_box_error(err: tower::BoxError) -> (StatusCode, String) {
+    if err.is::<tower_allowed_hosts::Error>() {
+        return (StatusCode::BAD_REQUEST, err.to_string());
+    }
+    return (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
+}
+```
+
 [license_badge]: https://img.shields.io/github/license/iamsauravsharma/tower_allowed_hosts.svg?style=for-the-badge
 [license_link]: LICENSE
 [cratesio_badge]: https://img.shields.io/crates/v/tower_allowed_hosts.svg?style=for-the-badge
