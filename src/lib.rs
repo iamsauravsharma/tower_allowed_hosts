@@ -19,17 +19,17 @@ const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 #[non_exhaustive]
 pub enum Error {
     /// error when host is failed to resolve
-    #[error("failed to resolve host for server")]
+    #[error("failed to resolve host")]
     FailedToResolveHost,
     /// error raised when host is not allowed
-    #[error("host not allowed for server")]
-    HostNotAllowed,
+    #[error("{0} not allowed")]
+    HostNotAllowed(String),
 }
 
 /// Allowed hosts layer which implements tower layer trait and contains allowed
 /// hosts which are used to resolve server hostname is valid or not
 ///
-/// Server hostname is resolved through the following, in order:
+/// Hostname is resolved through the following, in order:
 /// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
 ///   value is false)
@@ -253,9 +253,9 @@ where
             return Poll::Ready(Err(err));
         };
         if !project.layer.is_domain_allowed(&host) {
-            let err = Box::new(Error::HostNotAllowed);
             #[cfg(feature = "tracing")]
             tracing::debug!("blocked host: {host}");
+            let err = Box::new(Error::HostNotAllowed(host));
             return Poll::Ready(Err(err));
         }
         #[cfg(feature = "tracing")]
