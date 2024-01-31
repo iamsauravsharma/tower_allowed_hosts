@@ -287,6 +287,8 @@
 <a href="#285" id="285">285</a>
 <a href="#286" id="286">286</a>
 <a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
 <span class="kw">use </span>std::string::ToString;
@@ -301,17 +303,20 @@
 </span><span class="kw">use </span>wildmatch::WildMatch;
 
 <span class="kw">use </span><span class="kw">crate</span>::error::Error;
+<span class="kw">use </span><span class="kw">crate</span>::AllowedHostExtension;
 
 <span class="kw">const </span>X_FORWARDED_HOST_HEADER_KEY: <span class="kw-2">&amp;</span>str = <span class="string">"X-Forwarded-Host"</span>;
 
-<span class="doccomment">/// Allowed hosts layer which implements tower layer trait and contains allowed
-/// hosts which are used to resolve server hostname is valid or not
+<span class="doccomment">/// Allowed hosts layer to check if provided host is valid or not
 ///
 /// Hostname is resolved through the following, in order:
 /// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
 ///   value is false)
 /// - `Host` header
+///
+/// Determined host are always lowercase so use lowercase value when creating
+/// allowed host layer otherwise layer may reject host and block request
 ///
 /// All headers will get first host value for analyzing if any headers contains
 /// multiple header value than subsequent value gets ignored and not used for
@@ -479,7 +484,7 @@
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(host_uri) = <span class="kw-2">&amp;</span>host {
             <span class="kw">if </span>host_allowed {
                 req.extensions_mut()
-                    .insert(<span class="kw">crate</span>::extension::Host(host_uri.clone()));
+                    .insert(AllowedHostExtension(host_uri.clone()));
             }
         }
         <span class="kw">let </span>response_future = <span class="self">self</span>.inner.call(req);
@@ -532,7 +537,7 @@
 }
 
 <span class="kw">fn </span>get_host(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;Uri&gt; {
-    <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>;
+    <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>.to_ascii_lowercase();
     <span class="kw">let </span>host = host_str.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
     host.host()<span class="question-mark">?</span>;
     <span class="comment">// if host contains path, scheme or query than return None for host since it is
@@ -544,22 +549,21 @@
 }
 
 <span class="kw">fn </span>get_host_str(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-    <span class="comment">// get first forwarded value for value for host
-    </span><span class="kw">if </span>layer.use_forwarded {
+    <span class="kw">if </span>layer.use_forwarded {
         <span class="kw">let </span>forwarded_headers = headers.get_all(FORWARDED);
         <span class="kw">for </span>forwarded_header <span class="kw">in </span>forwarded_headers {
             <span class="kw">let </span>header_str = forwarded_header.to_str().ok()<span class="question-mark">?</span>;
             <span class="kw">let </span>splitted_headers = header_str.split(<span class="string">','</span>);
             <span class="kw">for </span>splitted_header <span class="kw">in </span>splitted_headers {
                 <span class="kw">let </span>(key, value) = splitted_header.split_once(<span class="string">'='</span>)<span class="question-mark">?</span>;
-                <span class="kw">if </span>key.trim().to_ascii_lowercase() != <span class="string">"host" </span>{
+                <span class="kw">if </span>key.trim().to_ascii_lowercase() == <span class="string">"host" </span>{
                     <span class="kw">return </span><span class="prelude-val">Some</span>(value.trim().trim_matches(<span class="string">'"'</span>).to_string());
                 }
             }
         }
     }
 
-    <span class="comment">// get first x forwarded host header for host
+    <span class="comment">// get `x-forwarded-host` value to determine whether pass value is valid or not
     </span><span class="kw">if </span>layer.use_x_forwarded_host {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = headers
             .get(X_FORWARDED_HOST_HEADER_KEY)
