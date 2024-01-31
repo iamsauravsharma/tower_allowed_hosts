@@ -5,6 +5,8 @@ use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
 use http::{HeaderMap, Request, Response, Uri};
+#[cfg(feature = "regex")]
+use regex::Regex;
 use tower::{BoxError, Layer, Service};
 #[cfg(feature = "wildcard")]
 use wildmatch::WildMatch;
@@ -28,46 +30,69 @@ const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 #[derive(Clone, Default)]
 pub struct AllowedHostLayer {
     allowed_hosts: Vec<String>,
+    #[cfg(feature = "wildcard")]
+    allowed_hosts_wildcard: Vec<WildMatch>,
+    #[cfg(feature = "regex")]
+    allowed_hosts_regex: Vec<Regex>,
     use_forwarded: bool,
     use_x_forwarded_host: bool,
 }
 
 impl AllowedHostLayer {
-    /// Create new allowed hosts layer.
+    /// Extend allowed hosts list using normal string. To match host value
+    /// should be same as given value
     ///
-    /// If wildcard features is enabled it also supports wildcard based matching
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::default().extend(["127.0.0.1"]);
+    /// ```
+    #[must_use]
+    pub fn extend<I, T>(mut self, hosts: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        self.allowed_hosts.extend(hosts.into_iter().map(Into::into));
+        self
+    }
+
+    /// Extend allowed hosts list using wildcard.
     /// - `?` matches exactly one occurrence of any character.
     /// - `*` matches arbitrary many (including zero) occurrences of any
     ///   character.
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new(["127.0.0.1"]);
+    /// let _ = AllowedHostLayer::default().extend_wildcard(["*.example.com"]);
     /// ```
     #[must_use]
-    pub fn new<I, T>(allowed_hosts: I) -> Self
+    #[cfg(feature = "wildcard")]
+    pub fn extend_wildcard<I, T>(mut self, hosts: I) -> Self
     where
         I: IntoIterator<Item = T>,
         T: Into<String>,
     {
-        Self {
-            allowed_hosts: allowed_hosts.into_iter().map(Into::into).collect(),
-            ..Default::default()
-        }
+        self.allowed_hosts_wildcard
+            .extend(hosts.into_iter().map(|h| WildMatch::new(&h.into())));
+        self
     }
 
-    /// Extend allowed hosts list
+    /// Extend allowed hosts list using regex. Regex is check to verify if
+    /// header is allowed or not
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().extend_host("127.0.0.1");
+    /// let layer = AllowedHostLayer::default();
+    /// let _ = layer.extend_regex([regex::Regex::new("^127.0.0.1$").unwrap()]);
     /// ```
     #[must_use]
-    pub fn extend_host<T>(mut self, host: T) -> Self
+    #[cfg(feature = "regex")]
+    pub fn extend_regex<I>(mut self, hosts: I) -> Self
     where
-        T: Into<String>,
+        I: IntoIterator<Item = Regex>,
     {
-        self.allowed_hosts.push(host.into());
+        self.allowed_hosts_regex
+            .extend(hosts.into_iter().map(Into::into));
         self
     }
 
@@ -76,7 +101,7 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new(["127.0.0.1"]).set_use_forwarded(true);
+    /// let _ = AllowedHostLayer::default().set_use_forwarded(true);
     /// ```
     #[must_use]
     pub fn set_use_forwarded(mut self, use_forwarded: bool) -> Self {
@@ -89,7 +114,7 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::new(["127.0.0.1"]).set_use_x_forwarded_host(true);
+    /// let _ = AllowedHostLayer::default().set_use_x_forwarded_host(true);
     /// ```
     #[must_use]
     pub fn set_use_x_forwarded_host(mut self, use_x_forwarded_host: bool) -> Self {
@@ -104,16 +129,25 @@ impl AllowedHostLayer {
     }
 
     fn is_host_allowed(&self, host: &Uri) -> bool {
-        #[cfg(not(feature = "wildcard"))]
         let is_allowed = self
             .allowed_hosts
             .iter()
             .any(|allowed_host| allowed_host == &host.to_string());
+
         #[cfg(feature = "wildcard")]
-        let is_allowed = self
-            .allowed_hosts
-            .iter()
-            .any(|allowed_host| WildMatch::new(allowed_host).matches(&host.to_string()));
+        let is_allowed = is_allowed
+            || self
+                .allowed_hosts_wildcard
+                .iter()
+                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(&host.to_string()));
+
+        #[cfg(feature = "regex")]
+        let is_allowed = is_allowed
+            || self
+                .allowed_hosts_regex
+                .iter()
+                .any(|allowed_host_regex| allowed_host_regex.is_match(&host.to_string()));
+
         is_allowed
     }
 }

@@ -23,13 +23,18 @@ tower_allowed_hosts = "0.4.0"
 To use non regex based hosts you can use
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(&["127.0.0.1".to_string()]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::default().extend(&["127.0.0.1".to_string()]);
 ```
 
+If you need to use wildcard based host matching you need to enable `wildcard` feature for crate than you can use
+
+```rust
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::default().extend_wildcard(&["127.0.0.*".to_string()]);
+```
 If you need to use regex based host matching you need to enable `regex` feature for crate than you can use
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::new_regex(&[regex::Regex::new("^127.0.0.1$")?]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::default().extend_regex(&[regex::Regex::new("^127.0.0.1$")?]);
 ```
 
 After creation of layer you can use layer in library which supports tower as component
