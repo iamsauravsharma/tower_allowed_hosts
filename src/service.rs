@@ -1,10 +1,13 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::string::ToString;
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
 use http::{HeaderMap, Request, Response, Uri};
 use tower::{BoxError, Layer, Service};
+#[cfg(feature = "wildcard")]
+use wildmatch::WildMatch;
 
 use crate::error::Error;
 
@@ -18,6 +21,10 @@ const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
 ///   value is false)
 /// - `Host` header
+///
+/// All headers will get first host value for analyzing if any headers contains
+/// multiple header value than subsequent value gets ignored and not used for
+/// analyzing whether host is allowed or not
 #[derive(Clone, Default)]
 pub struct AllowedHostLayer {
     allowed_hosts: Vec<String>,
@@ -26,7 +33,12 @@ pub struct AllowedHostLayer {
 }
 
 impl AllowedHostLayer {
-    /// Create new allowed hosts layer
+    /// Create new allowed hosts layer.
+    ///
+    /// If wildcard features is enabled it also supports wildcard based matching
+    /// - `?` matches exactly one occurrence of any character.
+    /// - `*` matches arbitrary many (including zero) occurrences of any
+    ///   character.
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
@@ -92,9 +104,17 @@ impl AllowedHostLayer {
     }
 
     fn is_host_allowed(&self, host: &Uri) -> bool {
-        self.allowed_hosts
+        #[cfg(not(feature = "wildcard"))]
+        let is_allowed = self
+            .allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == &host.to_string())
+            .any(|allowed_host| allowed_host == &host.to_string());
+        #[cfg(feature = "wildcard")]
+        let is_allowed = self
+            .allowed_hosts
+            .iter()
+            .any(|allowed_host| WildMatch::new(allowed_host).matches(&host.to_string()));
+        is_allowed
     }
 }
 
@@ -130,16 +150,20 @@ where
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
         let host = get_host(req.headers(), &self.layer);
-        // if there is any host value than add such value to extension of request
+        let host_allowed = host.clone().is_some_and(|h| self.layer.is_host_allowed(&h));
+        // if there is any host value and that host value is allowed than add extension
+        // to request
         if let Some(host_uri) = &host {
-            req.extensions_mut()
-                .insert(crate::extension::Host(host_uri.clone()));
+            if host_allowed {
+                req.extensions_mut()
+                    .insert(crate::extension::Host(host_uri.clone()));
+            }
         }
         let response_future = self.inner.call(req);
         AllowedHostFuture {
             response_future,
             host,
-            layer: self.layer.clone(),
+            host_allowed,
         }
     }
 }
@@ -152,7 +176,7 @@ pub struct AllowedHostFuture<F> {
     #[pin]
     host: Option<Uri>,
     #[pin]
-    layer: AllowedHostLayer,
+    host_allowed: bool,
 }
 
 impl<F, Response, E> Future for AllowedHostFuture<F>
@@ -168,7 +192,7 @@ where
             let err = Box::new(Error::FailedToResolveHost);
             return Poll::Ready(Err(err));
         };
-        if !project.layer.is_host_allowed(host) {
+        if !*project.host_allowed {
             #[cfg(feature = "tracing")]
             tracing::debug!("blocked host: {host}");
             let err = Box::new(Error::HostNotAllowed(host.to_string()));
@@ -197,6 +221,7 @@ fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Uri> {
 }
 
 fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
+    // get first forwarded value for value for host
     if layer.use_forwarded {
         let forwarded_headers = headers.get_all(FORWARDED);
         for forwarded_header in forwarded_headers {
@@ -210,6 +235,8 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
             }
         }
     }
+
+    // get first x forwarded host header for host
     if layer.use_x_forwarded_host {
         if let Some(host) = headers
             .get(X_FORWARDED_HOST_HEADER_KEY)
@@ -219,9 +246,8 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
         }
     }
 
-    if let Some(host) = headers.get(HOST).and_then(|host| host.to_str().ok()) {
-        return Some(host.to_string());
-    }
-
-    None
+    // get host header value. This will return first host header
+    headers
+        .get(HOST)
+        .and_then(|host| host.to_str().map(ToString::to_string).ok())
 }
