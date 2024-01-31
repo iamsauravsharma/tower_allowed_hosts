@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["error","service"],"struct":["AllowedHostExtension","AllowedHostLayer"]};
+window.SIDEBAR_ITEMS = {"mod":["error","service"],"struct":["AllowedHostLayer","Host"]};

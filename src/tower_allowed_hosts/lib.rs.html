@@ -18,6 +18,8 @@
 <a href="#16" id="16">16</a>
 <a href="#17" id="17">17</a>
 <a href="#18" id="18">18</a>
+<a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
 </span><span class="attr">#![cfg_attr(docsrs, feature(doc_auto_cfg))]
@@ -30,9 +32,11 @@
 <span class="doccomment">/// module for layer, service and future
 </span><span class="kw">pub mod </span>service;
 
-<span class="doccomment">/// Extension to store allowed host value.
+<span class="doccomment">/// Struct which holds value of Uri which was parsed and allowed by allowed host
+/// layer. This struct is added as a extension to request after successfully
+/// resolving host and verifying host is valid host which can be used in server
 </span><span class="attr">#[derive(Clone)]
-</span><span class="kw">pub struct </span>AllowedHostExtension(<span class="kw">pub </span>Uri);
+</span><span class="kw">pub struct </span>Host(<span class="kw">pub </span>Uri);
 
 <span class="attr">#[doc(inline)]
 </span><span class="kw">pub use </span>service::AllowedHostLayer;
