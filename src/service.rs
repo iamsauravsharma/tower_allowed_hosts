@@ -12,7 +12,7 @@ use tower::{BoxError, Layer, Service};
 use wildmatch::WildMatch;
 
 use crate::error::Error;
-use crate::AllowedHostExtension;
+use crate::Host;
 
 const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 
@@ -192,8 +192,7 @@ where
         // to request
         if let Some(host_uri) = &host {
             if host_allowed {
-                req.extensions_mut()
-                    .insert(AllowedHostExtension(host_uri.clone()));
+                req.extensions_mut().insert(Host(host_uri.clone()));
             }
         }
         let response_future = self.inner.call(req);

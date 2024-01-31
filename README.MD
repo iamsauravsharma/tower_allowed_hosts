@@ -15,7 +15,7 @@ Edit Cargo.toml file to add tower_allowed_hosts as dependencies
 
 ```toml
 [dependencies]
-tower_allowed_hosts = "0.4.0"
+tower_allowed_hosts = "0.5.0"
 ```
 
 # Usage
@@ -53,7 +53,8 @@ use tower_allowed_hosts::AllowedHostLayer;
 fn router() -> Router {
     let handle_error_layer = HandleErrorLayer::new(handle_box_error);
 
-    let allowed_hosts_layer = AllowedHostLayer::new_regex(&[regex::Regex::new("^127.0.0.1$")?]);
+    let allowed_hosts_layer = AllowedHostLayer::default()
+        .extend_wildcard(&["127.0.0.*".to_string()]);
 
      let layer = ServiceBuilder::new()
         .layer(handle_error_layer)
@@ -63,12 +64,15 @@ fn router() -> Router {
 }
 
 async fn handle_box_error(err: tower::BoxError) -> (StatusCode, String) {
-    if err.is::<tower_allowed_hosts::Error>() {
+    if err.is::<tower_allowed_hosts::error::Error>() {
         return (StatusCode::BAD_REQUEST, err.to_string());
     }
     return (StatusCode::INTERNAL_SERVER_ERROR, "".to_string())
 }
 ```
+
+There is also extension added after successfully parsing allowed host and allowing host which can be access using
+`tower_allowed_hosts::Host` struct Extension
 
 [license_badge]: https://img.shields.io/github/license/iamsauravsharma/tower_allowed_hosts.svg?style=for-the-badge
 [license_link]: LICENSE
