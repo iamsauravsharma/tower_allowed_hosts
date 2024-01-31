@@ -10,3 +10,5 @@ pub mod extension;
 
 /// module for layer, service and future
 pub mod service;
+
+pub use service::AllowedHostLayer;
