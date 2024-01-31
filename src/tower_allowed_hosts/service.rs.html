@@ -227,13 +227,42 @@
 <a href="#225" id="225">225</a>
 <a href="#226" id="226">226</a>
 <a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
+<span class="kw">use </span>std::string::ToString;
 <span class="kw">use </span>std::task::{Context, Poll};
 
 <span class="kw">use </span>http::header::{FORWARDED, HOST};
 <span class="kw">use </span>http::{HeaderMap, Request, Response, Uri};
 <span class="kw">use </span>tower::{BoxError, Layer, Service};
+<span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
+</span><span class="kw">use </span>wildmatch::WildMatch;
 
 <span class="kw">use </span><span class="kw">crate</span>::error::Error;
 
@@ -247,6 +276,10 @@
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
 ///   value is false)
 /// - `Host` header
+///
+/// All headers will get first host value for analyzing if any headers contains
+/// multiple header value than subsequent value gets ignored and not used for
+/// analyzing whether host is allowed or not
 </span><span class="attr">#[derive(Clone, Default)]
 </span><span class="kw">pub struct </span>AllowedHostLayer {
     allowed_hosts: Vec&lt;String&gt;,
@@ -255,7 +288,12 @@
 }
 
 <span class="kw">impl </span>AllowedHostLayer {
-    <span class="doccomment">/// Create new allowed hosts layer
+    <span class="doccomment">/// Create new allowed hosts layer.
+    ///
+    /// If wildcard features is enabled it also supports wildcard based matching
+    /// - `?` matches exactly one occurrence of any character.
+    /// - `*` matches arbitrary many (including zero) occurrences of any
+    ///   character.
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
@@ -321,9 +359,17 @@
     }
 
     <span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, host: <span class="kw-2">&amp;</span>Uri) -&gt; bool {
-        <span class="self">self</span>.allowed_hosts
+        <span class="attr">#[cfg(not(feature = <span class="string">"wildcard"</span>))]
+        </span><span class="kw">let </span>is_allowed = <span class="self">self
+            </span>.allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == <span class="kw-2">&amp;</span>host.to_string())
+            .any(|allowed_host| allowed_host == <span class="kw-2">&amp;</span>host.to_string());
+        <span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
+        </span><span class="kw">let </span>is_allowed = <span class="self">self
+            </span>.allowed_hosts
+            .iter()
+            .any(|allowed_host| WildMatch::new(allowed_host).matches(<span class="kw-2">&amp;</span>host.to_string()));
+        is_allowed
     }
 }
 
@@ -359,16 +405,20 @@
 
     <span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>req: Request&lt;ReqBody&gt;) -&gt; <span class="self">Self</span>::Future {
         <span class="kw">let </span>host = get_host(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer);
-        <span class="comment">// if there is any host value than add such value to extension of request
+        <span class="kw">let </span>host_allowed = host.clone().is_some_and(|h| <span class="self">self</span>.layer.is_host_allowed(<span class="kw-2">&amp;</span>h));
+        <span class="comment">// if there is any host value and that host value is allowed than add extension
+        // to request
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(host_uri) = <span class="kw-2">&amp;</span>host {
-            req.extensions_mut()
-                .insert(<span class="kw">crate</span>::extension::Host(host_uri.clone()));
+            <span class="kw">if </span>host_allowed {
+                req.extensions_mut()
+                    .insert(<span class="kw">crate</span>::extension::Host(host_uri.clone()));
+            }
         }
         <span class="kw">let </span>response_future = <span class="self">self</span>.inner.call(req);
         AllowedHostFuture {
             response_future,
             host,
-            layer: <span class="self">self</span>.layer.clone(),
+            host_allowed,
         }
     }
 }
@@ -381,7 +431,7 @@
     <span class="attr">#[pin]
     </span>host: <span class="prelude-ty">Option</span>&lt;Uri&gt;,
     <span class="attr">#[pin]
-    </span>layer: AllowedHostLayer,
+    </span>host_allowed: bool,
 }
 
 <span class="kw">impl</span>&lt;F, Response, E&gt; Future <span class="kw">for </span>AllowedHostFuture&lt;F&gt;
@@ -397,7 +447,7 @@
             <span class="kw">let </span>err = Box::new(Error::FailedToResolveHost);
             <span class="kw">return </span>Poll::Ready(<span class="prelude-val">Err</span>(err));
         };
-        <span class="kw">if </span>!project.layer.is_host_allowed(host) {
+        <span class="kw">if </span>!<span class="kw-2">*</span>project.host_allowed {
             <span class="attr">#[cfg(feature = <span class="string">"tracing"</span>)]
             </span><span class="macro">tracing::debug!</span>(<span class="string">"blocked host: {host}"</span>);
             <span class="kw">let </span>err = Box::new(Error::HostNotAllowed(host.to_string()));
@@ -426,7 +476,8 @@
 }
 
 <span class="kw">fn </span>get_host_str(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-    <span class="kw">if </span>layer.use_forwarded {
+    <span class="comment">// get first forwarded value for value for host
+    </span><span class="kw">if </span>layer.use_forwarded {
         <span class="kw">let </span>forwarded_headers = headers.get_all(FORWARDED);
         <span class="kw">for </span>forwarded_header <span class="kw">in </span>forwarded_headers {
             <span class="kw">let </span>header_str = forwarded_header.to_str().ok()<span class="question-mark">?</span>;
@@ -439,7 +490,9 @@
             }
         }
     }
-    <span class="kw">if </span>layer.use_x_forwarded_host {
+
+    <span class="comment">// get first x forwarded host header for host
+    </span><span class="kw">if </span>layer.use_x_forwarded_host {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = headers
             .get(X_FORWARDED_HOST_HEADER_KEY)
             .and_then(|host| host.to_str().ok())
@@ -448,10 +501,9 @@
         }
     }
 
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(host) = headers.get(HOST).and_then(|host| host.to_str().ok()) {
-        <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
-    }
-
-    <span class="prelude-val">None
-</span>}
+    <span class="comment">// get host header value. This will return first host header
+    </span>headers
+        .get(HOST)
+        .and_then(|host| host.to_str().map(ToString::to_string).ok())
+}
 </code></pre></div></section></main></body></html>
