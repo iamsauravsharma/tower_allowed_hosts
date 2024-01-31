@@ -12,17 +12,20 @@ use tower::{BoxError, Layer, Service};
 use wildmatch::WildMatch;
 
 use crate::error::Error;
+use crate::AllowedHostExtension;
 
 const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 
-/// Allowed hosts layer which implements tower layer trait and contains allowed
-/// hosts which are used to resolve server hostname is valid or not
+/// Allowed hosts layer to check if provided host is valid or not
 ///
 /// Hostname is resolved through the following, in order:
 /// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
 ///   value is false)
 /// - `Host` header
+///
+/// Determined host are always lowercase so use lowercase value when creating
+/// allowed host layer otherwise layer may reject host and block request
 ///
 /// All headers will get first host value for analyzing if any headers contains
 /// multiple header value than subsequent value gets ignored and not used for
@@ -190,7 +193,7 @@ where
         if let Some(host_uri) = &host {
             if host_allowed {
                 req.extensions_mut()
-                    .insert(crate::extension::Host(host_uri.clone()));
+                    .insert(AllowedHostExtension(host_uri.clone()));
             }
         }
         let response_future = self.inner.call(req);
@@ -243,7 +246,7 @@ where
 }
 
 fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Uri> {
-    let host_str = get_host_str(headers, layer)?;
+    let host_str = get_host_str(headers, layer)?.to_ascii_lowercase();
     let host = host_str.parse::<Uri>().ok()?;
     host.host()?;
     // if host contains path, scheme or query than return None for host since it is
@@ -255,7 +258,6 @@ fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Uri> {
 }
 
 fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
-    // get first forwarded value for value for host
     if layer.use_forwarded {
         let forwarded_headers = headers.get_all(FORWARDED);
         for forwarded_header in forwarded_headers {
@@ -263,14 +265,14 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
             let splitted_headers = header_str.split(',');
             for splitted_header in splitted_headers {
                 let (key, value) = splitted_header.split_once('=')?;
-                if key.trim().to_ascii_lowercase() != "host" {
+                if key.trim().to_ascii_lowercase() == "host" {
                     return Some(value.trim().trim_matches('"').to_string());
                 }
             }
         }
     }
 
-    // get first x forwarded host header for host
+    // get `x-forwarded-host` value to determine whether pass value is valid or not
     if layer.use_x_forwarded_host {
         if let Some(host) = headers
             .get(X_FORWARDED_HOST_HEADER_KEY)
