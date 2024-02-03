@@ -39,7 +39,7 @@ pub struct AllowedHostLayer {
     allowed_hosts_regex: Vec<Regex>,
     use_forwarded: bool,
     use_x_forwarded_host: bool,
-    reject_multiple_headers: bool,
+    reject_multiple_hosts: bool,
 }
 
 impl AllowedHostLayer {
@@ -129,15 +129,16 @@ impl AllowedHostLayer {
     /// Reject request is one header have multiple host. For example if there is
     /// two `HOST` header than it will reject such request since server cannot
     /// determine which header to use for validation. Default value of this is
-    /// true and it will get first value
+    /// false and it will get first value and will not reject request if
+    /// multiple host is present for one header
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_reject_multiple_headers(true);
+    /// let _ = AllowedHostLayer::default().set_reject_multiple_hosts(true);
     /// ```
     #[must_use]
-    pub fn set_reject_multiple_headers(mut self, reject_multiple_headers: bool) -> Self {
-        self.reject_multiple_headers = reject_multiple_headers;
+    pub fn set_reject_multiple_hosts(mut self, reject_multiple_hosts: bool) -> Self {
+        self.reject_multiple_hosts = reject_multiple_hosts;
         self
     }
 
@@ -284,7 +285,7 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
         }
         let mut obtained_hosts_iter = obtained_hosts.iter();
         if let Some(&host) = obtained_hosts_iter.next() {
-            if layer.reject_multiple_headers && obtained_hosts_iter.next().is_some() {
+            if layer.reject_multiple_hosts && obtained_hosts_iter.next().is_some() {
                 return None;
             }
             return Some(host.to_string());
@@ -304,7 +305,7 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
         }
         let mut obtained_hosts_iter = obtained_hosts.iter();
         if let Some(&host) = obtained_hosts_iter.next() {
-            if layer.reject_multiple_headers && obtained_hosts_iter.next().is_some() {
+            if layer.reject_multiple_hosts && obtained_hosts_iter.next().is_some() {
                 return None;
             }
             return Some(host.to_string());
@@ -323,7 +324,7 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
     }
     let mut obtained_hosts_iter = obtained_hosts.iter();
     if let Some(&host) = obtained_hosts_iter.next() {
-        if layer.reject_multiple_headers && obtained_hosts_iter.next().is_some() {
+        if layer.reject_multiple_hosts && obtained_hosts_iter.next().is_some() {
             return None;
         }
         return Some(host.to_string());
