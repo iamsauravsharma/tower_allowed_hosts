@@ -141,7 +141,7 @@ impl AllowedHostLayer {
         self
     }
 
-    fn is_host_allowed(&self, host: &Uri) -> bool {
+    fn is_host_allowed(&self, host: &str) -> bool {
         let is_allowed = self
             .allowed_hosts
             .iter()
@@ -152,14 +152,14 @@ impl AllowedHostLayer {
             || self
                 .allowed_hosts_wildcard
                 .iter()
-                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(&host.to_string()));
+                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(host));
 
         #[cfg(feature = "regex")]
         let is_allowed = is_allowed
             || self
                 .allowed_hosts_regex
                 .iter()
-                .any(|allowed_host_regex| allowed_host_regex.is_match(&host.to_string()));
+                .any(|allowed_host_regex| allowed_host_regex.is_match(host));
 
         is_allowed
     }
@@ -200,9 +200,9 @@ where
         let host_allowed = host.clone().is_some_and(|h| self.layer.is_host_allowed(&h));
         // if there is any host value and that host value is allowed than add extension
         // to request
-        if let Some(host_uri) = &host {
+        if let Some(host_val) = &host {
             if host_allowed {
-                req.extensions_mut().insert(Host(host_uri.clone()));
+                req.extensions_mut().insert(Host(host_val.to_string()));
             }
         }
         let response_future = self.inner.call(req);
@@ -220,7 +220,7 @@ pub struct AllowedHostFuture<F> {
     #[pin]
     response_future: F,
     #[pin]
-    host: Option<Uri>,
+    host: Option<String>,
     #[pin]
     host_allowed: bool,
 }
@@ -255,16 +255,16 @@ where
 }
 
 /// get host from different supported header name
-fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Uri> {
+fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
     let host_str = get_host_str(headers, layer)?.to_ascii_lowercase();
     let uri = host_str.parse::<Uri>().ok()?;
-    uri.host()?;
+    let authority = uri.authority()?;
     // if uri contains path, scheme or query than return None for uri since it is
     // not valid `HOST` header
     if !uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
         return None;
     }
-    Some(uri)
+    Some(authority.as_str().to_string())
 }
 
 fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
