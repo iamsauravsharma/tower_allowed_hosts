@@ -475,7 +475,7 @@
         <span class="self">self
     </span>}
 
-    <span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, host: <span class="kw-2">&amp;</span>Uri) -&gt; bool {
+    <span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, host: <span class="kw-2">&amp;</span>str) -&gt; bool {
         <span class="kw">let </span>is_allowed = <span class="self">self
             </span>.allowed_hosts
             .iter()
@@ -486,14 +486,14 @@
             || <span class="self">self
                 </span>.allowed_hosts_wildcard
                 .iter()
-                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(<span class="kw-2">&amp;</span>host.to_string()));
+                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(host));
 
         <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
         </span><span class="kw">let </span>is_allowed = is_allowed
             || <span class="self">self
                 </span>.allowed_hosts_regex
                 .iter()
-                .any(|allowed_host_regex| allowed_host_regex.is_match(<span class="kw-2">&amp;</span>host.to_string()));
+                .any(|allowed_host_regex| allowed_host_regex.is_match(host));
 
         is_allowed
     }
@@ -534,9 +534,9 @@
         <span class="kw">let </span>host_allowed = host.clone().is_some_and(|h| <span class="self">self</span>.layer.is_host_allowed(<span class="kw-2">&amp;</span>h));
         <span class="comment">// if there is any host value and that host value is allowed than add extension
         // to request
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(host_uri) = <span class="kw-2">&amp;</span>host {
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(host_val) = <span class="kw-2">&amp;</span>host {
             <span class="kw">if </span>host_allowed {
-                req.extensions_mut().insert(Host(host_uri.clone()));
+                req.extensions_mut().insert(Host(host_val.to_string()));
             }
         }
         <span class="kw">let </span>response_future = <span class="self">self</span>.inner.call(req);
@@ -554,7 +554,7 @@
     <span class="attr">#[pin]
     </span>response_future: F,
     <span class="attr">#[pin]
-    </span>host: <span class="prelude-ty">Option</span>&lt;Uri&gt;,
+    </span>host: <span class="prelude-ty">Option</span>&lt;String&gt;,
     <span class="attr">#[pin]
     </span>host_allowed: bool,
 }
@@ -589,16 +589,16 @@
 }
 
 <span class="doccomment">/// get host from different supported header name
-</span><span class="kw">fn </span>get_host(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;Uri&gt; {
+</span><span class="kw">fn </span>get_host(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
     <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>.to_ascii_lowercase();
     <span class="kw">let </span>uri = host_str.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
-    uri.host()<span class="question-mark">?</span>;
+    <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
     <span class="comment">// if uri contains path, scheme or query than return None for uri since it is
     // not valid `HOST` header
     </span><span class="kw">if </span>!uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
-    <span class="prelude-val">Some</span>(uri)
+    <span class="prelude-val">Some</span>(authority.as_str().to_string())
 }
 
 <span class="kw">fn </span>get_host_str(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
