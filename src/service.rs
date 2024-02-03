@@ -4,6 +4,7 @@ use std::string::ToString;
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
+use http::uri::Authority;
 use http::{HeaderMap, Request, Response, Uri};
 #[cfg(feature = "regex")]
 use regex::Regex;
@@ -27,9 +28,10 @@ const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 /// Determined host are always lowercase so use lowercase value when creating
 /// allowed host layer otherwise layer may reject host and block request
 ///
-/// All headers will get first host value for analyzing if any headers contains
-/// multiple header value than subsequent value gets ignored and not used for
-/// analyzing whether host is allowed or not
+/// By default, all headers will get first host value for analyzing if any
+/// headers contains multiple header value than subsequent value gets ignored
+/// if you want to reject multiple hosts than you have to enable reject multiple
+/// hosts settings
 #[derive(Clone, Default)]
 pub struct AllowedHostLayer {
     allowed_hosts: Vec<String>,
@@ -142,11 +144,12 @@ impl AllowedHostLayer {
         self
     }
 
-    fn is_host_allowed(&self, host: &str) -> bool {
+    fn is_host_allowed(&self, authority: &Authority) -> bool {
+        let host = authority.as_str();
         let is_allowed = self
             .allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == &host.to_string());
+            .any(|allowed_host| allowed_host == host);
 
         #[cfg(feature = "wildcard")]
         let is_allowed = is_allowed
@@ -197,7 +200,7 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
-        let host = get_host(req.headers(), &self.layer);
+        let host = get_authority(req.headers(), &self.layer);
         let host_allowed = host.clone().is_some_and(|h| self.layer.is_host_allowed(&h));
         // if there is any host value and that host value is allowed than add extension
         // to request
@@ -221,7 +224,7 @@ pub struct AllowedHostFuture<F> {
     #[pin]
     response_future: F,
     #[pin]
-    host: Option<String>,
+    host: Option<Authority>,
     #[pin]
     host_allowed: bool,
 }
@@ -256,7 +259,7 @@ where
 }
 
 /// get host from different supported header name
-fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
+fn get_authority(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Authority> {
     let host_str = get_host_str(headers, layer)?.to_ascii_lowercase();
     let uri = host_str.parse::<Uri>().ok()?;
     let authority = uri.authority()?;
@@ -265,7 +268,7 @@ fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
     if !uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
         return None;
     }
-    Some(authority.as_str().to_string())
+    Some(authority.clone())
 }
 
 fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
