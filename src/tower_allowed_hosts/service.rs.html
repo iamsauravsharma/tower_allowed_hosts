@@ -333,12 +333,16 @@
 <a href="#331" id="331">331</a>
 <a href="#332" id="332">332</a>
 <a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
 <span class="kw">use </span>std::string::ToString;
 <span class="kw">use </span>std::task::{Context, Poll};
 
 <span class="kw">use </span>http::header::{FORWARDED, HOST};
+<span class="kw">use </span>http::uri::Authority;
 <span class="kw">use </span>http::{HeaderMap, Request, Response, Uri};
 <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
 </span><span class="kw">use </span>regex::Regex;
@@ -362,9 +366,10 @@
 /// Determined host are always lowercase so use lowercase value when creating
 /// allowed host layer otherwise layer may reject host and block request
 ///
-/// All headers will get first host value for analyzing if any headers contains
-/// multiple header value than subsequent value gets ignored and not used for
-/// analyzing whether host is allowed or not
+/// By default, all headers will get first host value for analyzing if any
+/// headers contains multiple header value than subsequent value gets ignored
+/// if you want to reject multiple hosts than you have to enable reject multiple
+/// hosts settings
 </span><span class="attr">#[derive(Clone, Default)]
 </span><span class="kw">pub struct </span>AllowedHostLayer {
     allowed_hosts: Vec&lt;String&gt;,
@@ -477,11 +482,12 @@
         <span class="self">self
     </span>}
 
-    <span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, host: <span class="kw-2">&amp;</span>str) -&gt; bool {
+    <span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, authority: <span class="kw-2">&amp;</span>Authority) -&gt; bool {
+        <span class="kw">let </span>host = authority.as_str();
         <span class="kw">let </span>is_allowed = <span class="self">self
             </span>.allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == <span class="kw-2">&amp;</span>host.to_string());
+            .any(|allowed_host| allowed_host == host);
 
         <span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
         </span><span class="kw">let </span>is_allowed = is_allowed
@@ -532,7 +538,7 @@
     }
 
     <span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>req: Request&lt;ReqBody&gt;) -&gt; <span class="self">Self</span>::Future {
-        <span class="kw">let </span>host = get_host(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer);
+        <span class="kw">let </span>host = get_authority(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer);
         <span class="kw">let </span>host_allowed = host.clone().is_some_and(|h| <span class="self">self</span>.layer.is_host_allowed(<span class="kw-2">&amp;</span>h));
         <span class="comment">// if there is any host value and that host value is allowed than add extension
         // to request
@@ -556,7 +562,7 @@
     <span class="attr">#[pin]
     </span>response_future: F,
     <span class="attr">#[pin]
-    </span>host: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    </span>host: <span class="prelude-ty">Option</span>&lt;Authority&gt;,
     <span class="attr">#[pin]
     </span>host_allowed: bool,
 }
@@ -591,7 +597,7 @@
 }
 
 <span class="doccomment">/// get host from different supported header name
-</span><span class="kw">fn </span>get_host(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
+</span><span class="kw">fn </span>get_authority(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
     <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>.to_ascii_lowercase();
     <span class="kw">let </span>uri = host_str.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
     <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
@@ -600,7 +606,7 @@
     </span><span class="kw">if </span>!uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
-    <span class="prelude-val">Some</span>(authority.as_str().to_string())
+    <span class="prelude-val">Some</span>(authority.clone())
 }
 
 <span class="kw">fn </span>get_host_str(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
