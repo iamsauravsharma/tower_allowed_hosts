@@ -39,6 +39,7 @@ pub struct AllowedHostLayer {
     allowed_hosts_regex: Vec<Regex>,
     use_forwarded: bool,
     use_x_forwarded_host: bool,
+    reject_multiple_headers: bool,
 }
 
 impl AllowedHostLayer {
@@ -125,10 +126,19 @@ impl AllowedHostLayer {
         self
     }
 
-    /// Get allowed hosts
+    /// Reject request is one header have multiple host. For example if there is
+    /// two `HOST` header than it will reject such request since server cannot
+    /// determine which header to use for validation. Default value of this is
+    /// true and it will get first value
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let _ = AllowedHostLayer::default().set_reject_multiple_headers(true);
+    /// ```
     #[must_use]
-    pub fn allowed_hosts(&self) -> &[String] {
-        &self.allowed_hosts
+    pub fn set_reject_multiple_headers(mut self, reject_multiple_headers: bool) -> Self {
+        self.reject_multiple_headers = reject_multiple_headers;
+        self
     }
 
     fn is_host_allowed(&self, host: &Uri) -> bool {
@@ -244,45 +254,79 @@ where
     }
 }
 
+/// get host from different supported header name
 fn get_host(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Uri> {
     let host_str = get_host_str(headers, layer)?.to_ascii_lowercase();
-    let host = host_str.parse::<Uri>().ok()?;
-    host.host()?;
-    // if host contains path, scheme or query than return None for host since it is
-    // not valid host header
-    if !host.path().is_empty() || host.query().is_some() || host.scheme().is_some() {
+    let uri = host_str.parse::<Uri>().ok()?;
+    uri.host()?;
+    // if uri contains path, scheme or query than return None for uri since it is
+    // not valid `HOST` header
+    if !uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
         return None;
     }
-    Some(host)
+    Some(uri)
 }
 
 fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
+    // get `Forwarded` header value
     if layer.use_forwarded {
         let forwarded_headers = headers.get_all(FORWARDED);
+        let mut obtained_hosts = vec![];
         for forwarded_header in forwarded_headers {
             let header_str = forwarded_header.to_str().ok()?;
             let splitted_headers = header_str.split(',');
             for splitted_header in splitted_headers {
                 let (key, value) = splitted_header.split_once('=')?;
                 if key.trim().to_ascii_lowercase() == "host" {
-                    return Some(value.trim().trim_matches('"').to_string());
+                    obtained_hosts.push(value.trim().trim_matches('"'));
                 }
             }
         }
-    }
-
-    // get `x-forwarded-host` value to determine whether pass value is valid or not
-    if layer.use_x_forwarded_host {
-        if let Some(host) = headers
-            .get(X_FORWARDED_HOST_HEADER_KEY)
-            .and_then(|host| host.to_str().ok())
-        {
+        let mut obtained_hosts_iter = obtained_hosts.iter();
+        if let Some(&host) = obtained_hosts_iter.next() {
+            if layer.reject_multiple_headers && obtained_hosts_iter.next().is_some() {
+                return None;
+            }
             return Some(host.to_string());
         }
     }
 
-    // get host header value. This will return first host header
-    headers
-        .get(HOST)
-        .and_then(|host| host.to_str().map(ToString::to_string).ok())
+    // get `x-forwarded-host` value
+    if layer.use_x_forwarded_host {
+        let x_forwarded_headers = headers.get_all(X_FORWARDED_HOST_HEADER_KEY);
+        let mut obtained_hosts = vec![];
+        for x_forwarded_header in x_forwarded_headers {
+            let header_str = x_forwarded_header.to_str().ok()?;
+            let splitted_headers = header_str.split(',');
+            for splitted_header in splitted_headers {
+                obtained_hosts.push(splitted_header);
+            }
+        }
+        let mut obtained_hosts_iter = obtained_hosts.iter();
+        if let Some(&host) = obtained_hosts_iter.next() {
+            if layer.reject_multiple_headers && obtained_hosts_iter.next().is_some() {
+                return None;
+            }
+            return Some(host.to_string());
+        }
+    }
+
+    // get host header value.
+    let host_headers = headers.get_all(HOST);
+    let mut obtained_hosts = vec![];
+    for host_header in host_headers {
+        let header_str = host_header.to_str().ok()?;
+        let splitted_headers = header_str.split(',');
+        for splitted_header in splitted_headers {
+            obtained_hosts.push(splitted_header);
+        }
+    }
+    let mut obtained_hosts_iter = obtained_hosts.iter();
+    if let Some(&host) = obtained_hosts_iter.next() {
+        if layer.reject_multiple_headers && obtained_hosts_iter.next().is_some() {
+            return None;
+        }
+        return Some(host.to_string());
+    }
+    None
 }
