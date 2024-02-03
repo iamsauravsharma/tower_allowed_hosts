@@ -332,6 +332,7 @@
 <a href="#330" id="330">330</a>
 <a href="#331" id="331">331</a>
 <a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
 <span class="kw">use </span>std::string::ToString;
@@ -373,7 +374,7 @@
     </span>allowed_hosts_regex: Vec&lt;Regex&gt;,
     use_forwarded: bool,
     use_x_forwarded_host: bool,
-    reject_multiple_headers: bool,
+    reject_multiple_hosts: bool,
 }
 
 <span class="kw">impl </span>AllowedHostLayer {
@@ -463,15 +464,16 @@
     <span class="doccomment">/// Reject request is one header have multiple host. For example if there is
     /// two `HOST` header than it will reject such request since server cannot
     /// determine which header to use for validation. Default value of this is
-    /// true and it will get first value
+    /// false and it will get first value and will not reject request if
+    /// multiple host is present for one header
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_reject_multiple_headers(true);
+    /// let _ = AllowedHostLayer::default().set_reject_multiple_hosts(true);
     /// ```
     </span><span class="attr">#[must_use]
-    </span><span class="kw">pub fn </span>set_reject_multiple_headers(<span class="kw-2">mut </span><span class="self">self</span>, reject_multiple_headers: bool) -&gt; <span class="self">Self </span>{
-        <span class="self">self</span>.reject_multiple_headers = reject_multiple_headers;
+    </span><span class="kw">pub fn </span>set_reject_multiple_hosts(<span class="kw-2">mut </span><span class="self">self</span>, reject_multiple_hosts: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.reject_multiple_hosts = reject_multiple_hosts;
         <span class="self">self
     </span>}
 
@@ -618,7 +620,7 @@
         }
         <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts_iter = obtained_hosts.iter();
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>host) = obtained_hosts_iter.next() {
-            <span class="kw">if </span>layer.reject_multiple_headers &amp;&amp; obtained_hosts_iter.next().is_some() {
+            <span class="kw">if </span>layer.reject_multiple_hosts &amp;&amp; obtained_hosts_iter.next().is_some() {
                 <span class="kw">return </span><span class="prelude-val">None</span>;
             }
             <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
@@ -638,7 +640,7 @@
         }
         <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts_iter = obtained_hosts.iter();
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>host) = obtained_hosts_iter.next() {
-            <span class="kw">if </span>layer.reject_multiple_headers &amp;&amp; obtained_hosts_iter.next().is_some() {
+            <span class="kw">if </span>layer.reject_multiple_hosts &amp;&amp; obtained_hosts_iter.next().is_some() {
                 <span class="kw">return </span><span class="prelude-val">None</span>;
             }
             <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
@@ -657,7 +659,7 @@
     }
     <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts_iter = obtained_hosts.iter();
     <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>host) = obtained_hosts_iter.next() {
-        <span class="kw">if </span>layer.reject_multiple_headers &amp;&amp; obtained_hosts_iter.next().is_some() {
+        <span class="kw">if </span>layer.reject_multiple_hosts &amp;&amp; obtained_hosts_iter.next().is_some() {
             <span class="kw">return </span><span class="prelude-val">None</span>;
         }
         <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
