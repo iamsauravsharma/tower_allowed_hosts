@@ -15,7 +15,7 @@ Edit Cargo.toml file to add tower_allowed_hosts as dependencies
 
 ```toml
 [dependencies]
-tower_allowed_hosts = "0.5.0"
+tower_allowed_hosts = "0.6.0"
 ```
 
 # Usage
