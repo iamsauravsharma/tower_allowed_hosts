@@ -13,7 +13,7 @@ jobs:
     name: Deploy Github page
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup rust toolchain
         uses: dtolnay/rust-toolchain@nightly
       - name: Install cargo make

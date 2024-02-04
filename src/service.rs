@@ -46,7 +46,7 @@ pub struct AllowedHostLayer {
 
 impl AllowedHostLayer {
     /// Extend allowed hosts list using normal string. To match host value
-    /// should be same as given value
+    /// should be same as given value case sensitive
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
@@ -144,26 +144,28 @@ impl AllowedHostLayer {
         self
     }
 
+    /// check if authority i.e host is allowed or not. Host is lowercase than
+    /// check with provided value
     fn is_host_allowed(&self, authority: &Authority) -> bool {
-        let host = authority.as_str();
+        let host = authority.as_str().to_ascii_lowercase();
         let is_allowed = self
             .allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == host);
+            .any(|allowed_host| allowed_host == &host);
 
         #[cfg(feature = "wildcard")]
         let is_allowed = is_allowed
             || self
                 .allowed_hosts_wildcard
                 .iter()
-                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(host));
+                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(&host));
 
         #[cfg(feature = "regex")]
         let is_allowed = is_allowed
             || self
                 .allowed_hosts_regex
                 .iter()
-                .any(|allowed_host_regex| allowed_host_regex.is_match(host));
+                .any(|allowed_host_regex| allowed_host_regex.is_match(&host));
 
         is_allowed
     }
@@ -260,7 +262,7 @@ where
 
 /// get host from different supported header name
 fn get_authority(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Authority> {
-    let host_str = get_host_str(headers, layer)?.to_ascii_lowercase();
+    let host_str = get_host_str(headers, layer)?;
     let uri = host_str.parse::<Uri>().ok()?;
     let authority = uri.authority()?;
     // if uri contains path, scheme or query than return None for uri since it is

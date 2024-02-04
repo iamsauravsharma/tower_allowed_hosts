@@ -1,4 +1,4 @@
-/// Enum for different error
+/// Enum for different error generated from crates
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
