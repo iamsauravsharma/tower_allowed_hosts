@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/service.rs`."><title>service.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tower_allowed_hosts" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.0-nightly (bf3c6c5be 2024-02-01)" data-channel="nightly" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/service.rs`."><title>service.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tower_allowed_hosts" data-themes="" data-resource-suffix="" data-rustdoc-version="1.78.0-nightly (b11fbfbf3 2024-02-03)" data-channel="nightly" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-4c98445ec4002617.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title">
             <h2>Files</h2></div></nav><div class="sidebar-resizer"></div>
     <main><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../../tower_allowed_hosts/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
@@ -336,6 +336,8 @@
 <a href="#334" id="334">334</a>
 <a href="#335" id="335">335</a>
 <a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
 <span class="kw">use </span>std::string::ToString;
@@ -384,7 +386,7 @@
 
 <span class="kw">impl </span>AllowedHostLayer {
     <span class="doccomment">/// Extend allowed hosts list using normal string. To match host value
-    /// should be same as given value
+    /// should be same as given value case sensitive
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
@@ -482,26 +484,28 @@
         <span class="self">self
     </span>}
 
-    <span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, authority: <span class="kw-2">&amp;</span>Authority) -&gt; bool {
-        <span class="kw">let </span>host = authority.as_str();
+    <span class="doccomment">/// check if authority i.e host is allowed or not. Host is lowercase than
+    /// check with provided value
+    </span><span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, authority: <span class="kw-2">&amp;</span>Authority) -&gt; bool {
+        <span class="kw">let </span>host = authority.as_str().to_ascii_lowercase();
         <span class="kw">let </span>is_allowed = <span class="self">self
             </span>.allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == host);
+            .any(|allowed_host| allowed_host == <span class="kw-2">&amp;</span>host);
 
         <span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
         </span><span class="kw">let </span>is_allowed = is_allowed
             || <span class="self">self
                 </span>.allowed_hosts_wildcard
                 .iter()
-                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(host));
+                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(<span class="kw-2">&amp;</span>host));
 
         <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
         </span><span class="kw">let </span>is_allowed = is_allowed
             || <span class="self">self
                 </span>.allowed_hosts_regex
                 .iter()
-                .any(|allowed_host_regex| allowed_host_regex.is_match(host));
+                .any(|allowed_host_regex| allowed_host_regex.is_match(<span class="kw-2">&amp;</span>host));
 
         is_allowed
     }
@@ -598,7 +602,7 @@
 
 <span class="doccomment">/// get host from different supported header name
 </span><span class="kw">fn </span>get_authority(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
-    <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>.to_ascii_lowercase();
+    <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>;
     <span class="kw">let </span>uri = host_str.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
     <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
     <span class="comment">// if uri contains path, scheme or query than return None for uri since it is
