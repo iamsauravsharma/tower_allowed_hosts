@@ -1,6 +1,5 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::string::ToString;
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
@@ -281,10 +280,13 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
         for forwarded_header in forwarded_headers {
             let header_str = forwarded_header.to_str().ok()?;
             let splitted_headers = header_str.split(',');
-            for splitted_header in splitted_headers {
-                let (key, value) = splitted_header.split_once('=')?;
-                if key.trim().to_ascii_lowercase() == "host" {
-                    obtained_hosts.push(value.trim().trim_matches('"'));
+            for header in splitted_headers {
+                let header_parts = header.split(';');
+                for header_part in header_parts {
+                    let (key, value) = header_part.split_once('=')?;
+                    if key.trim().to_ascii_lowercase() == "host" {
+                        obtained_hosts.push(value.trim().trim_matches('"'));
+                    }
                 }
             }
         }
