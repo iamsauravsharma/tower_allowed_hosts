@@ -244,12 +244,10 @@ where
             return Poll::Ready(Err(err));
         };
         if !*project.host_allowed {
-            #[cfg(feature = "tracing")]
             tracing::debug!("blocked host: {host}");
             let err = Box::new(Error::HostNotAllowed(host.to_string()));
             return Poll::Ready(Err(err));
         }
-        #[cfg(feature = "tracing")]
         tracing::debug!("allowed host: {host}");
 
         match project.response_future.poll(cx) {
@@ -336,5 +334,6 @@ fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String>
         }
         return Some(host.to_string());
     }
+
     None
 }
