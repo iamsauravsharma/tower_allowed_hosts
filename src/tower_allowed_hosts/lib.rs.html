@@ -19,6 +19,10 @@
 <a href="#17" id="17">17</a>
 <a href="#18" id="18">18</a>
 <a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
+<a href="#23" id="23">23</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
 </span><span class="attr">#![cfg_attr(docsrs, feature(doc_auto_cfg))]
@@ -28,6 +32,10 @@
 
 <span class="doccomment">/// module for layer, service and future
 </span><span class="kw">pub mod </span>service;
+
+<span class="doccomment">/// Module for tests
+</span><span class="attr">#[cfg(test)]
+</span><span class="kw">mod </span>tests;
 
 <span class="doccomment">/// Struct which holds value of host along with its port if present which was
 /// parsed and allowed by allowed host layer. This struct is added as a
