@@ -12,10 +12,11 @@ pub mod service;
 #[cfg(test)]
 mod tests;
 
-/// Struct which holds value of host along with its port if present which was
-/// parsed and allowed by allowed host layer. This struct is added as a
-/// extension to request after successfully resolving host and verifying host is
-/// valid host which can be used in server if needed for further uses
+/// Struct which holds value of host along with its port.
+///
+/// This struct is added as a extension to request after successfully resolving
+/// host and verifying host is valid host which can be used in server if needed
+/// for further uses
 #[derive(Clone)]
 pub struct Host(pub String);
 
