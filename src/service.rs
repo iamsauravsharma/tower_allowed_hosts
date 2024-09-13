@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
 use http::uri::Authority;
-use http::{HeaderMap, Request, Response, Uri};
+use http::{HeaderMap, Request, Uri};
 #[cfg(feature = "regex")]
 use regex::Regex;
 use tower::{BoxError, Layer, Service};
@@ -127,11 +127,13 @@ impl AllowedHostLayer {
         self
     }
 
-    /// Reject request is one header have multiple host. For example if there is
-    /// two `HOST` header than it will reject such request since server cannot
-    /// determine which header to use for validation. Default value of this is
-    /// false and it will get first value and will not reject request if
-    /// multiple host is present for one header
+    /// Reject request if one header have multiple host.
+    ///
+    /// For example if there are two `HOST` header than it will reject such
+    /// request since server cannot determine which header to use for
+    /// validation. Default value of this is false and it will get first
+    /// value and will not reject request if multiple host is present for
+    /// one header
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
@@ -143,8 +145,8 @@ impl AllowedHostLayer {
         self
     }
 
-    /// check if authority i.e host is allowed or not. Host is lowercase than
-    /// check with provided value
+    /// check if authority i.e host is allowed or not. Convert host to lowercase
+    /// value than check with provided value
     fn is_host_allowed(&self, authority: &Authority) -> bool {
         let host = authority.as_str().to_ascii_lowercase();
         let is_allowed = self
@@ -187,9 +189,9 @@ pub struct AllowedHost<S> {
     inner: S,
     layer: AllowedHostLayer,
 }
-impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for AllowedHost<S>
+impl<S, ReqBody> Service<Request<ReqBody>> for AllowedHost<S>
 where
-    S: Service<Request<ReqBody>, Response = Response<ResBody>>,
+    S: Service<Request<ReqBody>>,
     S::Error: Into<BoxError>,
 {
     type Error = BoxError;
