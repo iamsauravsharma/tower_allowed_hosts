@@ -6,12 +6,12 @@
 | :--------------------------------------------: | :---------------------------------------: | :----------------------------------: |
 | [![License: MIT][license_badge]][license_link] | [![Crate][cratesio_badge]][cratesio_link] | [![Docs][docsrs_badge]][docsrs_link] |
 
-Tower service which limits request from only hosts 
-
+Tower service which limits request from only specified hosts
+All hostnames are automatically converted to lowercase before matching.
 
 ## Add as dependencies
 
-Edit Cargo.toml file to add tower_allowed_hosts as dependencies
+In your `Cargo.toml` file, add `tower_allowed_hosts` as a dependency:
 
 ```toml
 [dependencies]
@@ -20,26 +20,50 @@ tower_allowed_hosts = "0.7.0"
 
 # Usage
 
-To use non regex based hosts you can use
+### Basic
+
+To restrict access to specific basic hosts, you can use the following code:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::default().extend(&["127.0.0.1".to_string()]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
+    .extend(&["127.0.0.1".to_string()]);
 ```
 
-If you need to use wildcard based host matching you need to enable `wildcard` feature for crate than you can use
+### Wildcard
+
+If you need wildcard-based host matching, enable the `wildcard` feature in your `Cargo.toml`:
+
+```toml
+[dependencies]
+tower_allowed_hosts = { version = "0.7.0", features = ["wildcard"] }
+```
+
+You can then restrict hosts using wildcards:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::default().extend_wildcard(&["127.0.0.*".to_string()]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
+    .extend_wildcard(&["127.0.0.*".to_string()]);
 ```
-If you need to use regex based host matching you need to enable `regex` feature for crate than you can use
+
+### Regex
+
+If you need regex-based host matching, enable the `regex` feature in your `Cargo.toml`:
+
+```toml
+[dependencies]
+tower_allowed_hosts = { version = "0.7.0", features = ["regex"] }
+```
+
+You can then restrict hosts using regex patterns:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::default().extend_regex(&[regex::Regex::new("^127.0.0.1$")?]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
+    .extend_regex(&[regex::Regex::new("^127.0.0.1$")?]);
 ```
 
-After creation of layer you can use layer in library which supports tower as component
+# Integrating with a Tower-Compatible Library
 
-For example to use tower allowed hosts in axum you also needs to add HandleErrorLayer so error gets handled properly
+After creating the `AllowedHostLayer`, it can be integrated into any library that supports `tower` components. Here's an example of how to use this layer in an `axum` application. You will also need to handle errors properly using `HandleErrorLayer`:
 
 ```rust
 use axum::{

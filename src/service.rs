@@ -209,7 +209,7 @@ where
         // to request
         if let Some(host_val) = &host {
             if host_allowed {
-                req.extensions_mut().insert(Host(host_val.to_string()));
+                req.extensions_mut().insert(Host(host_val.clone()));
             }
         }
         let response_future = self.inner.call(req);
@@ -265,12 +265,13 @@ where
 fn get_authority(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Authority> {
     let host_str = get_host_str(headers, layer)?;
     let uri = host_str.parse::<Uri>().ok()?;
-    let authority = uri.authority()?;
     // if uri contains path, scheme or query than return None for uri since it is
     // not valid `HOST` header
     if !uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
         return None;
     }
+
+    let authority = uri.authority()?;
     Some(authority.clone())
 }
 
