@@ -342,7 +342,12 @@
 <a href="#341" id="341">341</a>
 <a href="#342" id="342">342</a>
 <a href="#343" id="343">343</a>
-<a href="#344" id="344">344</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
 <span class="kw">use </span>std::task::{Context, Poll};
 
@@ -616,6 +621,11 @@
     }
 
     <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
+    <span class="comment">// if authority string form contains @ than its not valid host header since
+    // credentials part are present in host which make it invalid so returns None
+    </span><span class="kw">if </span>authority.as_str().contains(<span class="string">'@'</span>) {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
     <span class="prelude-val">Some</span>(authority.clone())
 }
 
