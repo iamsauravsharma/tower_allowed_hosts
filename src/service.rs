@@ -272,6 +272,11 @@ fn get_authority(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Author
     }
 
     let authority = uri.authority()?;
+    // if authority string form contains @ than its not valid host header since
+    // credentials part are present in host which make it invalid so returns None
+    if authority.as_str().contains('@') {
+        return None;
+    }
     Some(authority.clone())
 }
 
