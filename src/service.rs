@@ -149,26 +149,34 @@ impl AllowedHostLayer {
     /// value than check with provided value
     fn is_host_allowed(&self, authority: &Authority) -> bool {
         let host = authority.as_str().to_ascii_lowercase();
-        let is_allowed = self
+
+        if self
             .allowed_hosts
             .iter()
-            .any(|allowed_host| allowed_host == &host);
+            .any(|allowed_host| allowed_host == &host)
+        {
+            return true;
+        }
 
         #[cfg(feature = "wildcard")]
-        let is_allowed = is_allowed
-            || self
-                .allowed_hosts_wildcard
-                .iter()
-                .any(|allowed_host_wildcard| allowed_host_wildcard.matches(&host));
+        if self
+            .allowed_hosts_wildcard
+            .iter()
+            .any(|allowed_host_wildcard| allowed_host_wildcard.matches(&host))
+        {
+            return true;
+        }
 
         #[cfg(feature = "regex")]
-        let is_allowed = is_allowed
-            || self
-                .allowed_hosts_regex
-                .iter()
-                .any(|allowed_host_regex| allowed_host_regex.is_match(&host));
+        if self
+            .allowed_hosts_regex
+            .iter()
+            .any(|allowed_host_regex| allowed_host_regex.is_match(&host))
+        {
+            return true;
+        }
 
-        is_allowed
+        false
     }
 }
 
