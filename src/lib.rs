@@ -1,7 +1,7 @@
 //! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
 //!
-//! Visit readme file to check how to use a library
+//! Check `README.MD` for example of using this crate
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use http::uri::Authority;

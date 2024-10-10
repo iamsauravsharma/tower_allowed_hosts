@@ -7,14 +7,17 @@ use http::uri::Authority;
 use http::{HeaderMap, Request, Uri};
 #[cfg(feature = "regex")]
 use regex::Regex;
-use tower::{BoxError, Layer, Service};
+use tower_layer::Layer;
+use tower_service::Service;
 #[cfg(feature = "wildcard")]
 use wildmatch::WildMatch;
 
-use crate::error::Error;
 use crate::Host;
+use crate::error::Error;
 
 const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
+
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Allowed hosts layer to check if provided host is valid or not
 ///
