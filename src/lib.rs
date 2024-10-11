@@ -2,7 +2,6 @@
 //! non allowed hosts request are blocked
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
-use http::uri::Authority;
 #[doc(inline)]
 pub use matcher::Matcher;
 #[doc(inline)]
@@ -27,4 +26,4 @@ mod tests;
 /// host and verifying host is valid host which can be used in server if needed
 /// for further uses
 #[derive(Clone)]
-pub struct Host(pub Authority);
+pub struct Host(pub String);

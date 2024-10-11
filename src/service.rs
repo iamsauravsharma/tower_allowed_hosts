@@ -7,8 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
-use http::uri::Authority;
-use http::{HeaderMap, Request, Uri};
+use http::{HeaderMap, Request};
 #[cfg(feature = "cache")]
 use lru::LruCache;
 use tower_layer::Layer;
@@ -282,7 +281,7 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
-        if let Some(host_val) = get_authority(req.headers(), &self.layer) {
+        if let Some(host_val) = get_host(req.headers(), &self.layer) {
             #[cfg(feature = "cache")]
             if let Some(cache) = &self.layer.cache {
                 if let Ok(mut mutex_guard) = cache.lock() {
@@ -336,7 +335,7 @@ where
 pub struct AllowedHostFuture<F> {
     #[pin]
     response_future: F,
-    host: Option<Authority>,
+    host: Option<String>,
     host_allowed: bool,
 }
 
@@ -377,9 +376,9 @@ where
     }
 }
 
-/// Extract the authority (host) from the request headers based on the layer
+/// Extract the host from the request headers based on the layer
 /// configuration.
-fn get_authority<M>(headers: &HeaderMap, layer: &AllowedHostLayer<M>) -> Option<Authority> {
+fn get_host<M>(headers: &HeaderMap, layer: &AllowedHostLayer<M>) -> Option<String> {
     // Attempt to extract host from Forwarded headers
     if layer.use_forwarded {
         if let Some(authority) = extract_from_forwarded(headers, layer.reject_multiple_hosts) {
@@ -400,7 +399,7 @@ fn get_authority<M>(headers: &HeaderMap, layer: &AllowedHostLayer<M>) -> Option<
 }
 
 /// Extract host from Forwarded headers.
-fn extract_from_forwarded(headers: &HeaderMap, reject_multiple: bool) -> Option<Authority> {
+fn extract_from_forwarded(headers: &HeaderMap, reject_multiple: bool) -> Option<String> {
     let mut obtained_hosts = Vec::new();
 
     for forwarded_header in headers.get_all(FORWARDED) {
@@ -420,7 +419,7 @@ fn extract_from_forwarded(headers: &HeaderMap, reject_multiple: bool) -> Option<
 }
 
 /// Extract host from X-Forwarded-Host headers.
-fn extract_from_x_forwarded_host(headers: &HeaderMap, reject_multiple: bool) -> Option<Authority> {
+fn extract_from_x_forwarded_host(headers: &HeaderMap, reject_multiple: bool) -> Option<String> {
     let mut obtained_hosts = Vec::new();
 
     for header in headers.get_all(X_FORWARDED_HOST_HEADER_KEY) {
@@ -432,7 +431,7 @@ fn extract_from_x_forwarded_host(headers: &HeaderMap, reject_multiple: bool) -> 
 }
 
 /// Extract host from Host headers.
-fn extract_from_host(headers: &HeaderMap, reject_multiple: bool) -> Option<Authority> {
+fn extract_from_host(headers: &HeaderMap, reject_multiple: bool) -> Option<String> {
     let mut obtained_hosts = Vec::new();
 
     for host_header in headers.get_all(HOST) {
@@ -443,9 +442,9 @@ fn extract_from_host(headers: &HeaderMap, reject_multiple: bool) -> Option<Autho
     validate_and_parse_hosts(&obtained_hosts, reject_multiple)
 }
 
-/// Validate the extracted hosts and parse the first valid authority.
+/// Validate the extracted hosts and get the first host else return None.
 /// If `reject_multiple` is true and multiple hosts are present, return None.
-fn validate_and_parse_hosts(obtained_hosts: &[String], reject_multiple: bool) -> Option<Authority> {
+fn validate_and_parse_hosts(obtained_hosts: &[String], reject_multiple: bool) -> Option<String> {
     let mut hosts_iter = obtained_hosts.iter();
 
     let first_host = hosts_iter.next()?;
@@ -453,20 +452,5 @@ fn validate_and_parse_hosts(obtained_hosts: &[String], reject_multiple: bool) ->
         return None;
     }
 
-    let uri = first_host.parse::<Uri>().ok()?;
-
-    if (uri.path() != "/" && !uri.path().is_empty())
-        || uri.query().is_some()
-        || uri.scheme().is_some()
-    {
-        return None;
-    }
-
-    let authority = uri.authority()?;
-    // Ensure authority does not contain user info
-    if authority.as_str().contains('@') {
-        return None;
-    }
-
-    Some(authority.clone())
+    Some(first_host.clone())
 }
