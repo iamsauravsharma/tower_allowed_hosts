@@ -470,10 +470,7 @@
 <a href="#469" id="469">469</a>
 <a href="#470" id="470">470</a>
 <a href="#471" id="471">471</a>
-<a href="#472" id="472">472</a>
-<a href="#473" id="473">473</a>
-<a href="#474" id="474">474</a>
-<a href="#475" id="475">475</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
+<a href="#472" id="472">472</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="attr">#[cfg(feature = <span class="string">"cache"</span>)]
 </span><span class="kw">use </span>std::num::NonZeroUsize;
 <span class="kw">use </span>std::pin::Pin;
@@ -503,9 +500,6 @@
 /// - `Forwarded` header (if `use_forwarded` is true)
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true)
 /// - `Host` header
-///
-/// Determined hosts are always lowercase. Ensure to use lowercase values when
-/// creating the allowed host layer to avoid unintended request blocking.
 ///
 /// By default, the first host value from the headers is used. If multiple
 /// host values are present, subsequent values are ignored unless
