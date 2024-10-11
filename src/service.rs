@@ -1,10 +1,16 @@
 use std::future::Future;
+#[cfg(feature = "cache")]
+use std::num::NonZeroUsize;
 use std::pin::Pin;
+#[cfg(feature = "cache")]
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
 use http::uri::Authority;
 use http::{HeaderMap, Request, Uri};
+#[cfg(feature = "cache")]
+use lru::LruCache;
 use tower_layer::Layer;
 use tower_service::Service;
 
@@ -91,13 +97,15 @@ pub struct AllowedHostLayer<M> {
     use_forwarded: bool,
     use_x_forwarded_host: bool,
     reject_multiple_hosts: bool,
+    #[cfg(feature = "cache")]
+    cache: Option<Arc<Mutex<LruCache<String, bool>>>>,
 }
 
 impl<M> AllowedHostLayer<M>
 where
     M: Matcher,
 {
-    /// Create new allowed hosts layer with provide matchers
+    /// Create new allowed hosts layer with provided matchers
     ///
     /// # Examples
     ///
@@ -115,6 +123,34 @@ where
             use_forwarded: false,
             use_x_forwarded_host: false,
             reject_multiple_hosts: false,
+            #[cfg(feature = "cache")]
+            cache: None,
+        }
+    }
+
+    /// Create new allowed hosts layer with provided matchers and cap size
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let layer = AllowedHostLayer::new_with_cache_cap(
+    ///     vec!["127.0.0.1".to_string()],
+    ///     std::num::NonZeroUsize::new(24).unwrap(),
+    /// );
+    /// ```
+    #[cfg(feature = "cache")]
+    #[must_use]
+    pub fn new_with_cache_cap<I>(matchers: I, cap: NonZeroUsize) -> Self
+    where
+        I: IntoIterator<Item = M>,
+    {
+        Self {
+            matchers: matchers.into_iter().collect(),
+            use_forwarded: false,
+            use_x_forwarded_host: false,
+            reject_multiple_hosts: false,
+            cache: Some(Arc::new(Mutex::new(LruCache::new(cap)))),
         }
     }
 
@@ -132,6 +168,39 @@ where
         I: IntoIterator<Item = M>,
     {
         self.matchers.extend(matchers);
+        self
+    }
+
+    /// Set lru cache cap
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let layer = AllowedHostLayer::<String>::default()
+    ///     .set_cap_size(std::num::NonZeroUsize::new(20).unwrap());
+    /// ```
+    #[cfg(feature = "cache")]
+    #[must_use]
+    pub fn set_cap_size(mut self, cap: NonZeroUsize) -> Self {
+        self.cache = Some(Arc::new(Mutex::new(LruCache::new(cap))));
+        self
+    }
+
+    /// Disable cache
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tower_allowed_hosts::AllowedHostLayer;
+    /// let layer = AllowedHostLayer::<String>::default()
+    ///     .set_cap_size(std::num::NonZeroUsize::new(20).unwrap())
+    ///     .disable_cache();
+    /// ```
+    #[cfg(feature = "cache")]
+    #[must_use]
+    pub fn disable_cache(mut self) -> Self {
+        self.cache = None;
         self
     }
 
@@ -215,25 +284,52 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        let host = get_authority(req.headers(), &self.layer);
-        let host_allowed = host
-            .as_ref()
-            .map(|h| h.as_str().to_ascii_lowercase())
-            .is_some_and(|h| self.layer.matchers.iter().any(|m| m.matches_host(&h)));
+    fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
+        if let Some(host_val) = get_authority(req.headers(), &self.layer) {
+            #[cfg(feature = "cache")]
+            if let Some(cache) = &self.layer.cache {
+                if let Ok(mut mutex_guard) = cache.lock() {
+                    if let Some(&host_allowed) = mutex_guard.get(host_val.as_str()) {
+                        if host_allowed {
+                            req.extensions_mut().insert(Host(host_val.clone()));
+                        }
+                        return Self::Future {
+                            response_future: self.inner.call(req),
+                            host: Some(host_val),
+                            host_allowed,
+                        };
+                    }
+                }
+            }
 
-        // If the host is allowed, insert it into the request extensions
-        let mut req = req;
-        if let Some(ref host_val) = host {
+            let host_allowed = self
+                .layer
+                .matchers
+                .iter()
+                .any(|m| m.matches_host(host_val.as_str()));
+
             if host_allowed {
                 req.extensions_mut().insert(Host(host_val.clone()));
             }
+
+            #[cfg(feature = "cache")]
+            if let Some(cache) = &self.layer.cache {
+                if let Ok(mut mutex_guard) = cache.lock() {
+                    mutex_guard.put(host_val.to_string(), host_allowed);
+                }
+            }
+            return Self::Future {
+                response_future: self.inner.call(req),
+                host: Some(host_val),
+                host_allowed,
+            };
         }
 
+        // if no host is found than request is not allowed
         AllowedHostFuture {
             response_future: self.inner.call(req),
-            host,
-            host_allowed,
+            host: None,
+            host_allowed: false,
         }
     }
 }

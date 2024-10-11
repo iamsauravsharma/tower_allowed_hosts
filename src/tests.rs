@@ -21,7 +21,8 @@ async fn inner_svc(_: Request<BoxBody>) -> Result<Response<BoxBody>, Infallible>
 
 #[tokio::test]
 async fn normal() {
-    let allowed_host_layer = AllowedHostLayer::default().extend(["127.0.0.1".to_string()]);
+    let allowed_host_layer: AllowedHostLayer<String> =
+        AllowedHostLayer::default().extend(["127.0.0.1".to_string()]);
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -37,6 +38,17 @@ async fn normal() {
         )
         .await;
     assert!(valid_host_header_res.is_ok());
+
+    let valid_from_cache = svc
+        .clone()
+        .oneshot(
+            Request::builder()
+                .header("HOST", "127.0.0.1")
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await;
+    assert!(valid_from_cache.is_ok());
 
     let invalid_host_header_res = svc
         .clone()
@@ -279,4 +291,49 @@ async fn regex() {
         )
         .await;
     assert!(issue_no_3.is_err());
+}
+
+#[cfg(feature = "cache")]
+#[tokio::test]
+async fn cache() {
+    let allowed_host_layer = AllowedHostLayer::default()
+        .set_cap_size(std::num::NonZeroUsize::new(8).unwrap())
+        .push("127.0.0.1");
+    let svc = allowed_host_layer.layer(service_fn(inner_svc));
+
+    let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
+    assert!(empty_res.is_err());
+
+    let valid_host_header_res = svc
+        .clone()
+        .oneshot(
+            Request::builder()
+                .header("HOST", "127.0.0.1")
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await;
+    assert!(valid_host_header_res.is_ok());
+
+    let from_cache = svc
+        .clone()
+        .oneshot(
+            Request::builder()
+                .header("HOST", "127.0.0.1")
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await;
+    assert!(from_cache.is_ok());
+
+    let issue_header = svc
+        .clone()
+        .oneshot(
+            Request::builder()
+                .header("HOST", "127.0.0.20")
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await;
+    assert!(issue_header.is_err());
 }
