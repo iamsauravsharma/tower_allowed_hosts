@@ -25,18 +25,24 @@
 <a href="#24" id="24">24</a>
 <a href="#25" id="25">25</a>
 <a href="#26" id="26">26</a>
-<a href="#27" id="27">27</a></pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
+<a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a></pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
-//!
-//! Check `README.MD` for example of using this crate
 </span><span class="attr">#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 </span><span class="kw">use </span>http::uri::Authority;
+<span class="attr">#[doc(inline)]
+</span><span class="kw">pub use </span>matcher::Matcher;
 <span class="attr">#[doc(inline)]
 </span><span class="kw">pub use </span>service::AllowedHostLayer;
 
 <span class="doccomment">/// module for error
 </span><span class="kw">pub mod </span>error;
+
+<span class="doccomment">/// module for matcher
+</span><span class="kw">pub mod </span>matcher;
 
 <span class="doccomment">/// module for layer, service and future
 </span><span class="kw">pub mod </span>service;
