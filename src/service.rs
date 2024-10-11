@@ -12,28 +12,36 @@ use tower_service::Service;
 #[cfg(feature = "wildcard")]
 use wildmatch::WildMatch;
 
-use crate::Host;
 use crate::error::Error;
+use crate::Host;
 
 const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// Allowed hosts layer to check if provided host is valid or not
+/// Allowed hosts layer to check if the provided host is valid.
 ///
-/// Hostname is resolved through the following, in order:
-/// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
-/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
-///   value is false)
+/// The hostname is resolved through the following, in order:
+/// - `Forwarded` header (if `use_forwarded` is true)
+/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true)
 /// - `Host` header
 ///
-/// Determined host are always lowercase so use lowercase value when creating
-/// allowed host layer otherwise layer may reject host and block request
+/// Determined hosts are always lowercase. Ensure to use lowercase values when
+/// creating the allowed host layer to avoid unintended request blocking.
 ///
-/// By default, all headers will get first host value for analyzing if any
-/// headers contains multiple header value than subsequent value gets ignored
-/// if you want to reject multiple hosts than you have to enable reject multiple
-/// hosts settings
+/// By default, the first host value from the headers is used. If multiple
+/// host values are present, subsequent values are ignored unless
+/// `reject_multiple_hosts` is enabled, which will reject the request.
+///
+/// # Examples
+///
+/// ```rust
+/// use tower_allowed_hosts::AllowedHostLayer;
+/// let layer = AllowedHostLayer::default()
+///     .extend(["example.com", "api.example.com"])
+///     .set_use_forwarded(true)
+///     .set_reject_multiple_hosts(true);
+/// ```
 #[derive(Clone, Default)]
 pub struct AllowedHostLayer {
     allowed_hosts: Vec<String>,
@@ -47,12 +55,13 @@ pub struct AllowedHostLayer {
 }
 
 impl AllowedHostLayer {
-    /// Extend allowed hosts list using normal string. To match host value
-    /// should be same as given value case sensitive
+    /// Extend allowed hosts list using exact string matches.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().extend(["127.0.0.1"]);
+    /// let layer = AllowedHostLayer::default().extend(["127.0.0.1", "localhost"]);
     /// ```
     #[must_use]
     pub fn extend<I, T>(mut self, hosts: I) -> Self
@@ -64,14 +73,16 @@ impl AllowedHostLayer {
         self
     }
 
-    /// Extend allowed hosts list using wildcard.
+    /// Extend allowed hosts list using wildcard patterns.
     /// - `?` matches exactly one occurrence of any character.
     /// - `*` matches arbitrary many (including zero) occurrences of any
     ///   character.
     ///
+    /// # Examples
+    ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().extend_wildcard(["*.example.com"]);
+    /// let layer = AllowedHostLayer::default().extend_wildcard(["*.example.com"]);
     /// ```
     #[must_use]
     #[cfg(feature = "wildcard")]
@@ -85,13 +96,17 @@ impl AllowedHostLayer {
         self
     }
 
-    /// Extend allowed hosts list using regex. Regex is check to verify if
-    /// header is allowed or not
+    /// Extend allowed hosts list using regular expressions.
+    ///
+    /// # Examples
     ///
     /// ```rust
+    /// use regex::Regex;
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default();
-    /// let _ = layer.extend_regex([regex::Regex::new("^127.0.0.1$").unwrap()]);
+    /// let layer = AllowedHostLayer::default().extend_regex([
+    ///     Regex::new(r"^127\.0\.0\.1$").unwrap(),
+    ///     Regex::new(r"^localhost$").unwrap(),
+    /// ]);
     /// ```
     #[must_use]
     #[cfg(feature = "regex")]
@@ -99,17 +114,17 @@ impl AllowedHostLayer {
     where
         I: IntoIterator<Item = Regex>,
     {
-        self.allowed_hosts_regex
-            .extend(hosts.into_iter().map(Into::into));
+        self.allowed_hosts_regex.extend(hosts);
         self
     }
 
-    /// Set `use_forwarded` to provided value. If it is set to true than
-    /// `Forwarded` header is used
+    /// Enable or disable the use of the `Forwarded` header.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_use_forwarded(true);
+    /// let layer = AllowedHostLayer::default().set_use_forwarded(true);
     /// ```
     #[must_use]
     pub fn set_use_forwarded(mut self, use_forwarded: bool) -> Self {
@@ -117,12 +132,13 @@ impl AllowedHostLayer {
         self
     }
 
-    /// Set `use_x_forwarded_host` to provided value. If it is set to true than
-    /// `X-Forwarded-Host` header is used
+    /// Enable or disable the use of the `X-Forwarded-Host` header.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_use_x_forwarded_host(true);
+    /// let layer = AllowedHostLayer::default().set_use_x_forwarded_host(true);
     /// ```
     #[must_use]
     pub fn set_use_x_forwarded_host(mut self, use_x_forwarded_host: bool) -> Self {
@@ -130,53 +146,54 @@ impl AllowedHostLayer {
         self
     }
 
-    /// Reject request if one header have multiple host.
+    /// Configure the layer to reject requests with multiple host values in a
+    /// single header.
     ///
-    /// For example if there are two `HOST` header than it will reject such
-    /// request since server cannot determine which header to use for
-    /// validation. Default value of this is false and it will get first
-    /// value and will not reject request if multiple host is present for
-    /// one header
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_reject_multiple_hosts(true);
+    /// let layer = AllowedHostLayer::default().set_reject_multiple_hosts(true);
     /// ```
     #[must_use]
-    pub fn set_reject_multiple_hosts(mut self, reject_multiple_hosts: bool) -> Self {
-        self.reject_multiple_hosts = reject_multiple_hosts;
+    pub fn set_reject_multiple_hosts(mut self, reject: bool) -> Self {
+        self.reject_multiple_hosts = reject;
         self
     }
 
-    /// check if authority i.e host is allowed or not. Convert host to lowercase
-    /// value than check with provided value
+    /// Check if the provided authority (host) is allowed.
+    ///
+    /// The host is converted to lowercase before matching.
     fn is_host_allowed(&self, authority: &Authority) -> bool {
         let host = authority.as_str().to_ascii_lowercase();
 
-        if self
-            .allowed_hosts
-            .iter()
-            .any(|allowed_host| allowed_host == &host)
-        {
+        // Exact match using HashSet for O(1) lookup
+        if self.allowed_hosts.contains(&host) {
             return true;
         }
 
+        // Wildcard match
         #[cfg(feature = "wildcard")]
-        if self
-            .allowed_hosts_wildcard
-            .iter()
-            .any(|allowed_host_wildcard| allowed_host_wildcard.matches(&host))
         {
-            return true;
+            if self
+                .allowed_hosts_wildcard
+                .iter()
+                .any(|pattern| pattern.matches(&host))
+            {
+                return true;
+            }
         }
 
+        // Regex match
         #[cfg(feature = "regex")]
-        if self
-            .allowed_hosts_regex
-            .iter()
-            .any(|allowed_host_regex| allowed_host_regex.is_match(&host))
         {
-            return true;
+            if self
+                .allowed_hosts_regex
+                .iter()
+                .any(|regex| regex.is_match(&host))
+            {
+                return true;
+            }
         }
 
         false
@@ -194,12 +211,14 @@ impl<S> Layer<S> for AllowedHostLayer {
     }
 }
 
-/// Allowed hosts service
+/// Allowed hosts service that wraps the inner service and validates the request
+/// host.
 #[derive(Clone)]
 pub struct AllowedHost<S> {
     inner: S,
     layer: AllowedHostLayer,
 }
+
 impl<S, ReqBody> Service<Request<ReqBody>> for AllowedHost<S>
 where
     S: Service<Request<ReqBody>>,
@@ -213,33 +232,32 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
+    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         let host = get_authority(req.headers(), &self.layer);
-        let host_allowed = host.clone().is_some_and(|h| self.layer.is_host_allowed(&h));
-        // if there is any host value and that host value is allowed than add extension
-        // to request
-        if let Some(host_val) = &host {
+        let host_allowed = host.as_ref().is_some_and(|h| self.layer.is_host_allowed(h));
+
+        // If the host is allowed, insert it into the request extensions
+        let mut req = req;
+        if let Some(ref host_val) = host {
             if host_allowed {
                 req.extensions_mut().insert(Host(host_val.clone()));
             }
         }
-        let response_future = self.inner.call(req);
+
         AllowedHostFuture {
-            response_future,
+            response_future: self.inner.call(req),
             host,
             host_allowed,
         }
     }
 }
 
-/// Future for Allowed hosts
+/// Future for AllowedHost service.
 #[pin_project::pin_project]
 pub struct AllowedHostFuture<F> {
     #[pin]
     response_future: F,
-    #[pin]
     host: Option<Authority>,
-    #[pin]
     host_allowed: bool,
 }
 
@@ -251,110 +269,118 @@ where
     type Output = Result<Response, BoxError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let project = self.project();
-        let Some(host) = &*project.host else {
-            let err = Box::new(Error::FailedToResolveHost);
-            return Poll::Ready(Err(err));
-        };
-        if !*project.host_allowed {
-            #[cfg(feature = "tracing")]
-            tracing::debug!("blocked host: {host}");
-            let err = Box::new(Error::HostNotAllowed(host.to_string()));
-            return Poll::Ready(Err(err));
-        }
-        #[cfg(feature = "tracing")]
-        tracing::debug!("allowed host: {host}");
+        let this = self.project();
 
-        match project.response_future.poll(cx) {
-            Poll::Ready(result) => Poll::Ready(result.map_err(Into::into)),
-            Poll::Pending => Poll::Pending,
+        match (&this.host, this.host_allowed) {
+            (Some(host), true) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("allowed host: {}", host);
+                // Proceed to poll the inner future
+                match this.response_future.poll(cx) {
+                    Poll::Ready(result) => Poll::Ready(result.map_err(Into::into)),
+                    Poll::Pending => Poll::Pending,
+                }
+            }
+            (Some(host), false) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("blocked host: {}", host);
+                Poll::Ready(Err(Box::new(Error::HostNotAllowed(host.to_string()))))
+            }
+            (None, _) => Poll::Ready(Err(Box::new(Error::FailedToResolveHost))),
         }
     }
 }
 
-/// get host from different supported header name
+/// Extract the authority (host) from the request headers based on the layer
+/// configuration.
 fn get_authority(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Authority> {
-    let host_str = get_host_str(headers, layer)?;
-    let uri = host_str.parse::<Uri>().ok()?;
-    // if uri contains path, scheme or query than return None for uri since it is
-    // not valid `HOST` header
-    if !uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
-        return None;
+    // Attempt to extract host from Forwarded headers
+    if layer.use_forwarded {
+        if let Some(authority) = extract_from_forwarded(headers, layer.reject_multiple_hosts) {
+            return Some(authority);
+        }
     }
 
-    let authority = uri.authority()?;
-    // if authority string form contains @ than its not valid host header since
-    // credentials part are present in host which make it invalid so returns None
-    if authority.as_str().contains('@') {
-        return None;
+    // Attempt to extract host from X-Forwarded-Host headers
+    if layer.use_x_forwarded_host {
+        if let Some(authority) = extract_from_x_forwarded_host(headers, layer.reject_multiple_hosts)
+        {
+            return Some(authority);
+        }
     }
-    Some(authority.clone())
+
+    // Fallback to Host headers
+    extract_from_host(headers, layer.reject_multiple_hosts)
 }
 
-fn get_host_str(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<String> {
-    // get `Forwarded` header value
-    if layer.use_forwarded {
-        let forwarded_headers = headers.get_all(FORWARDED);
-        let mut obtained_hosts = vec![];
-        for forwarded_header in forwarded_headers {
-            let header_str = forwarded_header.to_str().ok()?;
-            let splitted_headers = header_str.split(',');
-            for header in splitted_headers {
-                let header_parts = header.split(';');
-                for header_part in header_parts {
-                    let (key, value) = header_part.split_once('=')?;
-                    if key.trim().to_ascii_lowercase() == "host" {
-                        obtained_hosts.push(value.trim().trim_matches('"'));
+/// Extract host from Forwarded headers.
+fn extract_from_forwarded(headers: &HeaderMap, reject_multiple: bool) -> Option<Authority> {
+    let mut obtained_hosts = Vec::new();
+
+    for forwarded_header in headers.get_all(FORWARDED) {
+        let header_str = forwarded_header.to_str().ok()?;
+        for header in header_str.split(',') {
+            for part in header.split(';') {
+                if let Some((key, value)) = part.split_once('=') {
+                    if key.trim().eq_ignore_ascii_case("host") {
+                        obtained_hosts.push(value.trim().trim_matches('"').to_string());
                     }
                 }
             }
         }
-        let mut obtained_hosts_iter = obtained_hosts.iter();
-        if let Some(&host) = obtained_hosts_iter.next() {
-            if layer.reject_multiple_hosts && obtained_hosts_iter.next().is_some() {
-                return None;
-            }
-            return Some(host.to_string());
-        }
     }
 
-    // get `x-forwarded-host` value
-    if layer.use_x_forwarded_host {
-        let x_forwarded_headers = headers.get_all(X_FORWARDED_HOST_HEADER_KEY);
-        let mut obtained_hosts = vec![];
-        for x_forwarded_header in x_forwarded_headers {
-            let header_str = x_forwarded_header.to_str().ok()?;
-            let splitted_headers = header_str.split(',');
-            for splitted_header in splitted_headers {
-                obtained_hosts.push(splitted_header);
-            }
-        }
-        let mut obtained_hosts_iter = obtained_hosts.iter();
-        if let Some(&host) = obtained_hosts_iter.next() {
-            if layer.reject_multiple_hosts && obtained_hosts_iter.next().is_some() {
-                return None;
-            }
-            return Some(host.to_string());
-        }
+    validate_and_parse_hosts(&obtained_hosts, reject_multiple)
+}
+
+/// Extract host from X-Forwarded-Host headers.
+fn extract_from_x_forwarded_host(headers: &HeaderMap, reject_multiple: bool) -> Option<Authority> {
+    let mut obtained_hosts = Vec::new();
+
+    for header in headers.get_all(X_FORWARDED_HOST_HEADER_KEY) {
+        let header_str = header.to_str().ok()?;
+        obtained_hosts.extend(header_str.split(',').map(|s| s.trim().to_string()));
     }
 
-    // get host header value.
-    let host_headers = headers.get_all(HOST);
-    let mut obtained_hosts = vec![];
-    for host_header in host_headers {
+    validate_and_parse_hosts(&obtained_hosts, reject_multiple)
+}
+
+/// Extract host from Host headers.
+fn extract_from_host(headers: &HeaderMap, reject_multiple: bool) -> Option<Authority> {
+    let mut obtained_hosts = Vec::new();
+
+    for host_header in headers.get_all(HOST) {
         let header_str = host_header.to_str().ok()?;
-        let splitted_headers = header_str.split(',');
-        for splitted_header in splitted_headers {
-            obtained_hosts.push(splitted_header);
-        }
-    }
-    let mut obtained_hosts_iter = obtained_hosts.iter();
-    if let Some(&host) = obtained_hosts_iter.next() {
-        if layer.reject_multiple_hosts && obtained_hosts_iter.next().is_some() {
-            return None;
-        }
-        return Some(host.to_string());
+        obtained_hosts.extend(header_str.split(',').map(|s| s.trim().to_string()));
     }
 
-    None
+    validate_and_parse_hosts(&obtained_hosts, reject_multiple)
+}
+
+/// Validate the extracted hosts and parse the first valid authority.
+/// If `reject_multiple` is true and multiple hosts are present, return None.
+fn validate_and_parse_hosts(obtained_hosts: &[String], reject_multiple: bool) -> Option<Authority> {
+    let mut hosts_iter = obtained_hosts.iter();
+
+    let first_host = hosts_iter.next()?;
+    if reject_multiple && hosts_iter.next().is_some() {
+        return None;
+    }
+
+    let uri = first_host.parse::<Uri>().ok()?;
+
+    if (uri.path() != "/" && !uri.path().is_empty())
+        || uri.query().is_some()
+        || uri.scheme().is_some()
+    {
+        return None;
+    }
+
+    let authority = uri.authority()?;
+    // Ensure authority does not contain user info
+    if authority.as_str().contains('@') {
+        return None;
+    }
+
+    Some(authority.clone())
 }

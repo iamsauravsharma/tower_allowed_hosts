@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use bytes::Bytes;
 use http::{Request, Response};
 use http_body_util::BodyExt;
-use tower::{BoxError, Layer, ServiceExt, service_fn};
+use tower::{service_fn, BoxError, Layer, ServiceExt};
 
 use crate::AllowedHostLayer;
 
