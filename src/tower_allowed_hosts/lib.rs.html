@@ -27,13 +27,11 @@
 <a href="#26" id="26">26</a>
 <a href="#27" id="27">27</a>
 <a href="#28" id="28">28</a>
-<a href="#29" id="29">29</a>
-<a href="#30" id="30">30</a></pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
+<a href="#29" id="29">29</a></pre></div><pre class="rust"><code><span class="doccomment">//! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
 </span><span class="attr">#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
-</span><span class="kw">use </span>http::uri::Authority;
-<span class="attr">#[doc(inline)]
+#[doc(inline)]
 </span><span class="kw">pub use </span>matcher::Matcher;
 <span class="attr">#[doc(inline)]
 </span><span class="kw">pub use </span>service::AllowedHostLayer;
@@ -57,5 +55,5 @@
 /// host and verifying host is valid host which can be used in server if needed
 /// for further uses
 </span><span class="attr">#[derive(Clone)]
-</span><span class="kw">pub struct </span>Host(<span class="kw">pub </span>Authority);
+</span><span class="kw">pub struct </span>Host(<span class="kw">pub </span>String);
 </code></pre></div></section></main></body></html>

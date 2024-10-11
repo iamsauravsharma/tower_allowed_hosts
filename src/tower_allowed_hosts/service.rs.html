@@ -454,23 +454,7 @@
 <a href="#453" id="453">453</a>
 <a href="#454" id="454">454</a>
 <a href="#455" id="455">455</a>
-<a href="#456" id="456">456</a>
-<a href="#457" id="457">457</a>
-<a href="#458" id="458">458</a>
-<a href="#459" id="459">459</a>
-<a href="#460" id="460">460</a>
-<a href="#461" id="461">461</a>
-<a href="#462" id="462">462</a>
-<a href="#463" id="463">463</a>
-<a href="#464" id="464">464</a>
-<a href="#465" id="465">465</a>
-<a href="#466" id="466">466</a>
-<a href="#467" id="467">467</a>
-<a href="#468" id="468">468</a>
-<a href="#469" id="469">469</a>
-<a href="#470" id="470">470</a>
-<a href="#471" id="471">471</a>
-<a href="#472" id="472">472</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
+<a href="#456" id="456">456</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="attr">#[cfg(feature = <span class="string">"cache"</span>)]
 </span><span class="kw">use </span>std::num::NonZeroUsize;
 <span class="kw">use </span>std::pin::Pin;
@@ -479,8 +463,7 @@
 <span class="kw">use </span>std::task::{Context, Poll};
 
 <span class="kw">use </span>http::header::{FORWARDED, HOST};
-<span class="kw">use </span>http::uri::Authority;
-<span class="kw">use </span>http::{HeaderMap, Request, Uri};
+<span class="kw">use </span>http::{HeaderMap, Request};
 <span class="attr">#[cfg(feature = <span class="string">"cache"</span>)]
 </span><span class="kw">use </span>lru::LruCache;
 <span class="kw">use </span>tower_layer::Layer;
@@ -754,7 +737,7 @@
     }
 
     <span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>req: Request&lt;ReqBody&gt;) -&gt; <span class="self">Self</span>::Future {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(host_val) = get_authority(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer) {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(host_val) = get_host(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer) {
             <span class="attr">#[cfg(feature = <span class="string">"cache"</span>)]
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(cache) = <span class="kw-2">&amp;</span><span class="self">self</span>.layer.cache {
                 <span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>mutex_guard) = cache.lock() {
@@ -808,7 +791,7 @@
 </span><span class="kw">pub struct </span>AllowedHostFuture&lt;F&gt; {
     <span class="attr">#[pin]
     </span>response_future: F,
-    host: <span class="prelude-ty">Option</span>&lt;Authority&gt;,
+    host: <span class="prelude-ty">Option</span>&lt;String&gt;,
     host_allowed: bool,
 }
 
@@ -849,9 +832,9 @@
     }
 }
 
-<span class="doccomment">/// Extract the authority (host) from the request headers based on the layer
+<span class="doccomment">/// Extract the host from the request headers based on the layer
 /// configuration.
-</span><span class="kw">fn </span>get_authority&lt;M&gt;(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer&lt;M&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+</span><span class="kw">fn </span>get_host&lt;M&gt;(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer&lt;M&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
     <span class="comment">// Attempt to extract host from Forwarded headers
     </span><span class="kw">if </span>layer.use_forwarded {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(authority) = extract_from_forwarded(headers, layer.reject_multiple_hosts) {
@@ -872,7 +855,7 @@
 }
 
 <span class="doccomment">/// Extract host from Forwarded headers.
-</span><span class="kw">fn </span>extract_from_forwarded(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+</span><span class="kw">fn </span>extract_from_forwarded(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = Vec::new();
 
     <span class="kw">for </span>forwarded_header <span class="kw">in </span>headers.get_all(FORWARDED) {
@@ -892,7 +875,7 @@
 }
 
 <span class="doccomment">/// Extract host from X-Forwarded-Host headers.
-</span><span class="kw">fn </span>extract_from_x_forwarded_host(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+</span><span class="kw">fn </span>extract_from_x_forwarded_host(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = Vec::new();
 
     <span class="kw">for </span>header <span class="kw">in </span>headers.get_all(X_FORWARDED_HOST_HEADER_KEY) {
@@ -904,7 +887,7 @@
 }
 
 <span class="doccomment">/// Extract host from Host headers.
-</span><span class="kw">fn </span>extract_from_host(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+</span><span class="kw">fn </span>extract_from_host(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = Vec::new();
 
     <span class="kw">for </span>host_header <span class="kw">in </span>headers.get_all(HOST) {
@@ -915,9 +898,9 @@
     validate_and_parse_hosts(<span class="kw-2">&amp;</span>obtained_hosts, reject_multiple)
 }
 
-<span class="doccomment">/// Validate the extracted hosts and parse the first valid authority.
+<span class="doccomment">/// Validate the extracted hosts and get the first host else return None.
 /// If `reject_multiple` is true and multiple hosts are present, return None.
-</span><span class="kw">fn </span>validate_and_parse_hosts(obtained_hosts: <span class="kw-2">&amp;</span>[String], reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+</span><span class="kw">fn </span>validate_and_parse_hosts(obtained_hosts: <span class="kw-2">&amp;</span>[String], reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>hosts_iter = obtained_hosts.iter();
 
     <span class="kw">let </span>first_host = hosts_iter.next()<span class="question-mark">?</span>;
@@ -925,21 +908,6 @@
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
 
-    <span class="kw">let </span>uri = first_host.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
-
-    <span class="kw">if </span>(uri.path() != <span class="string">"/" </span>&amp;&amp; !uri.path().is_empty())
-        || uri.query().is_some()
-        || uri.scheme().is_some()
-    {
-        <span class="kw">return </span><span class="prelude-val">None</span>;
-    }
-
-    <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
-    <span class="comment">// Ensure authority does not contain user info
-    </span><span class="kw">if </span>authority.as_str().contains(<span class="string">'@'</span>) {
-        <span class="kw">return </span><span class="prelude-val">None</span>;
-    }
-
-    <span class="prelude-val">Some</span>(authority.clone())
+    <span class="prelude-val">Some</span>(first_host.clone())
 }
 </code></pre></div></section></main></body></html>
