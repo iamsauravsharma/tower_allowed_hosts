@@ -29,9 +29,6 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true)
 /// - `Host` header
 ///
-/// Determined hosts are always lowercase. Ensure to use lowercase values when
-/// creating the allowed host layer to avoid unintended request blocking.
-///
 /// By default, the first host value from the headers is used. If multiple
 /// host values are present, subsequent values are ignored unless
 /// `reject_multiple_hosts` is enabled, which will reject the request.
