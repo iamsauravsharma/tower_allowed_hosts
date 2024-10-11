@@ -42,7 +42,7 @@ You can then restrict hosts using wildcards:
 
 ```rust
 let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
-    .extend_wildcard(&["127.0.0.*".to_string()]);
+    .extend(&[wildmatch::WildMatch::new("127.0.0.*")]);
 ```
 
 ### Regex
@@ -57,8 +57,7 @@ tower_allowed_hosts = { version = "0.7.0", features = ["regex"] }
 You can then restrict hosts using regex patterns:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
-    .extend_regex(&[regex::Regex::new("^127.0.0.1$")?]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(&[regex::Regex::new("^127.0.0.1$")?]);
 ```
 
 # Integrating with a Tower-Compatible Library
@@ -78,7 +77,7 @@ fn router() -> Router {
     let handle_error_layer = HandleErrorLayer::new(handle_box_error);
 
     let allowed_hosts_layer = AllowedHostLayer::default()
-        .extend_wildcard(&["127.0.0.*".to_string()]);
+        .extend(&[wildmatch::WildMatch::new("127.0.0.*")]);
 
      let layer = ServiceBuilder::new()
         .layer(handle_error_layer)
