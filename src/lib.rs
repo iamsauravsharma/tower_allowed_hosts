@@ -1,15 +1,18 @@
 //! Crate which provides allowed hosts layer for tower based service where all
 //! non allowed hosts request are blocked
-//!
-//! Check `README.MD` for example of using this crate
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use http::uri::Authority;
+#[doc(inline)]
+pub use matcher::Matcher;
 #[doc(inline)]
 pub use service::AllowedHostLayer;
 
 /// module for error
 pub mod error;
+
+/// module for matcher
+pub mod matcher;
 
 /// module for layer, service and future
 pub mod service;

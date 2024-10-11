@@ -5,14 +5,11 @@ use std::task::{Context, Poll};
 use http::header::{FORWARDED, HOST};
 use http::uri::Authority;
 use http::{HeaderMap, Request, Uri};
-#[cfg(feature = "regex")]
-use regex::Regex;
 use tower_layer::Layer;
 use tower_service::Service;
-#[cfg(feature = "wildcard")]
-use wildmatch::WildMatch;
 
 use crate::error::Error;
+use crate::matcher::Matcher;
 use crate::Host;
 
 const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
@@ -33,7 +30,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// host values are present, subsequent values are ignored unless
 /// `reject_multiple_hosts` is enabled, which will reject the request.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
 /// use tower_allowed_hosts::AllowedHostLayer;
@@ -42,79 +39,99 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 ///     .set_use_forwarded(true)
 ///     .set_reject_multiple_hosts(true);
 /// ```
+///
+/// # Supporting Multiple Match Types
+/// To support matching against multiple types you can use an `enum` to wrap
+/// different matcher types and implement `Matcher` for that enum.
+///
+/// # Example with Enum
+/// ```rust
+/// use tower_allowed_hosts::Matcher;
+/// enum MultiMatcher {
+///     Exact(String),
+///     #[cfg(feature = "wildcard")]
+///     Wildcard(wildmatch::WildMatch),
+///     #[cfg(feature = "regex")]
+///     Regex(regex::Regex),
+/// }
+///
+/// impl Matcher for MultiMatcher {
+///     fn matches_host(&self, host: &str) -> bool {
+///         match self {
+///             MultiMatcher::Exact(value) => value.matches_host(host),
+///             #[cfg(feature = "wildcard")]
+///             MultiMatcher::Wildcard(pattern) => pattern.matches_host(host),
+///             #[cfg(feature = "regex")]
+///             MultiMatcher::Regex(regex) => regex.matches_host(host),
+///         }
+///     }
+/// }
+///
+/// let mut layer = tower_allowed_hosts::AllowedHostLayer::new([MultiMatcher::Exact(
+///     "example.com".to_string(),
+/// )])
+/// .set_use_forwarded(true)
+/// .set_reject_multiple_hosts(true);
+/// #[cfg(feature = "wildcard")]
+/// {
+///     layer = layer.push(MultiMatcher::Wildcard(wildmatch::WildMatch::new(
+///         "127.0.0.?",
+///     )));
+/// }
+/// #[cfg(feature = "regex")]
+/// {
+///     layer = layer.push(MultiMatcher::Regex(
+///         regex::Regex::new("^[a-z]+.example.com$").unwrap(),
+///     ));
+/// }
+/// ```
 #[derive(Clone, Default)]
-pub struct AllowedHostLayer {
-    allowed_hosts: Vec<String>,
-    #[cfg(feature = "wildcard")]
-    allowed_hosts_wildcard: Vec<WildMatch>,
-    #[cfg(feature = "regex")]
-    allowed_hosts_regex: Vec<Regex>,
+pub struct AllowedHostLayer<M> {
+    matchers: Vec<M>,
     use_forwarded: bool,
     use_x_forwarded_host: bool,
     reject_multiple_hosts: bool,
 }
 
-impl AllowedHostLayer {
-    /// Extend allowed hosts list using exact string matches.
+impl<M> AllowedHostLayer<M>
+where
+    M: Matcher,
+{
+    /// Create new allowed hosts layer with provide matchers
     ///
     /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default().extend(["127.0.0.1", "localhost"]);
+    /// let layer = AllowedHostLayer::new(vec!["127.0.0.1".to_string()]);
     /// ```
     #[must_use]
-    pub fn extend<I, T>(mut self, hosts: I) -> Self
+    pub fn new<I>(matchers: I) -> Self
     where
-        I: IntoIterator<Item = T>,
-        T: Into<String>,
+        I: IntoIterator<Item = M>,
     {
-        self.allowed_hosts.extend(hosts.into_iter().map(Into::into));
+        Self {
+            matchers: matchers.into_iter().collect(),
+            use_forwarded: false,
+            use_x_forwarded_host: false,
+            reject_multiple_hosts: false,
+        }
+    }
+
+    /// Add a matcher to allowed hosts layer
+    #[must_use]
+    pub fn push(mut self, matcher: M) -> Self {
+        self.matchers.push(matcher);
         self
     }
 
-    /// Extend allowed hosts list using wildcard patterns.
-    /// - `?` matches exactly one occurrence of any character.
-    /// - `*` matches arbitrary many (including zero) occurrences of any
-    ///   character.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default().extend_wildcard(["*.example.com"]);
-    /// ```
+    /// Extend allowed hosts layer with provided matchers
     #[must_use]
-    #[cfg(feature = "wildcard")]
-    pub fn extend_wildcard<I, T>(mut self, hosts: I) -> Self
+    pub fn extend<I>(mut self, matchers: I) -> Self
     where
-        I: IntoIterator<Item = T>,
-        T: Into<String>,
+        I: IntoIterator<Item = M>,
     {
-        self.allowed_hosts_wildcard
-            .extend(hosts.into_iter().map(|h| WildMatch::new(&h.into())));
-        self
-    }
-
-    /// Extend allowed hosts list using regular expressions.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use regex::Regex;
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default().extend_regex([
-    ///     Regex::new(r"^127\.0\.0\.1$").unwrap(),
-    ///     Regex::new(r"^localhost$").unwrap(),
-    /// ]);
-    /// ```
-    #[must_use]
-    #[cfg(feature = "regex")]
-    pub fn extend_regex<I>(mut self, hosts: I) -> Self
-    where
-        I: IntoIterator<Item = Regex>,
-    {
-        self.allowed_hosts_regex.extend(hosts);
+        self.matchers.extend(matchers);
         self
     }
 
@@ -124,7 +141,7 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default().set_use_forwarded(true);
+    /// let layer = AllowedHostLayer::<String>::default().set_use_forwarded(true);
     /// ```
     #[must_use]
     pub fn set_use_forwarded(mut self, use_forwarded: bool) -> Self {
@@ -138,7 +155,7 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default().set_use_x_forwarded_host(true);
+    /// let layer = AllowedHostLayer::<&str>::default().set_use_x_forwarded_host(true);
     /// ```
     #[must_use]
     pub fn set_use_x_forwarded_host(mut self, use_x_forwarded_host: bool) -> Self {
@@ -153,55 +170,20 @@ impl AllowedHostLayer {
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default().set_reject_multiple_hosts(true);
+    /// let layer = AllowedHostLayer::<String>::default().set_reject_multiple_hosts(true);
     /// ```
     #[must_use]
     pub fn set_reject_multiple_hosts(mut self, reject: bool) -> Self {
         self.reject_multiple_hosts = reject;
         self
     }
-
-    /// Check if the provided authority (host) is allowed.
-    ///
-    /// The host is converted to lowercase before matching.
-    fn is_host_allowed(&self, authority: &Authority) -> bool {
-        let host = authority.as_str().to_ascii_lowercase();
-
-        // Exact match using HashSet for O(1) lookup
-        if self.allowed_hosts.contains(&host) {
-            return true;
-        }
-
-        // Wildcard match
-        #[cfg(feature = "wildcard")]
-        {
-            if self
-                .allowed_hosts_wildcard
-                .iter()
-                .any(|pattern| pattern.matches(&host))
-            {
-                return true;
-            }
-        }
-
-        // Regex match
-        #[cfg(feature = "regex")]
-        {
-            if self
-                .allowed_hosts_regex
-                .iter()
-                .any(|regex| regex.is_match(&host))
-            {
-                return true;
-            }
-        }
-
-        false
-    }
 }
 
-impl<S> Layer<S> for AllowedHostLayer {
-    type Service = AllowedHost<S>;
+impl<M, S> Layer<S> for AllowedHostLayer<M>
+where
+    M: Clone,
+{
+    type Service = AllowedHost<M, S>;
 
     fn layer(&self, inner: S) -> Self::Service {
         Self::Service {
@@ -214,15 +196,16 @@ impl<S> Layer<S> for AllowedHostLayer {
 /// Allowed hosts service that wraps the inner service and validates the request
 /// host.
 #[derive(Clone)]
-pub struct AllowedHost<S> {
+pub struct AllowedHost<M, S> {
     inner: S,
-    layer: AllowedHostLayer,
+    layer: AllowedHostLayer<M>,
 }
 
-impl<S, ReqBody> Service<Request<ReqBody>> for AllowedHost<S>
+impl<M, S, ReqBody> Service<Request<ReqBody>> for AllowedHost<M, S>
 where
     S: Service<Request<ReqBody>>,
     S::Error: Into<BoxError>,
+    M: Matcher,
 {
     type Error = BoxError;
     type Future = AllowedHostFuture<S::Future>;
@@ -234,7 +217,10 @@ where
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         let host = get_authority(req.headers(), &self.layer);
-        let host_allowed = host.as_ref().is_some_and(|h| self.layer.is_host_allowed(h));
+        let host_allowed = host
+            .as_ref()
+            .map(|h| h.as_str().to_ascii_lowercase())
+            .is_some_and(|h| self.layer.matchers.iter().any(|m| m.matches_host(&h)));
 
         // If the host is allowed, insert it into the request extensions
         let mut req = req;
@@ -271,29 +257,36 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
 
-        match (&this.host, this.host_allowed) {
-            (Some(host), true) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("allowed host: {}", host);
-                // Proceed to poll the inner future
+        let poll = match (&this.host, &this.host_allowed) {
+            (Some(_), true) => {
                 match this.response_future.poll(cx) {
                     Poll::Ready(result) => Poll::Ready(result.map_err(Into::into)),
                     Poll::Pending => Poll::Pending,
                 }
             }
             (Some(host), false) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("blocked host: {}", host);
-                Poll::Ready(Err(Box::new(Error::HostNotAllowed(host.to_string()))))
+                Poll::Ready(Err(Box::new(Error::HostNotAllowed(host.to_string())).into()))
             }
-            (None, _) => Poll::Ready(Err(Box::new(Error::FailedToResolveHost))),
+            (None, _) => Poll::Ready(Err(Box::new(Error::FailedToResolveHost).into())),
+        };
+        #[cfg(feature = "tracing")]
+        {
+            if let Some(host) = &this.host {
+                if poll.is_ready() {
+                    match this.host_allowed {
+                        true => tracing::debug!("allowed host: {}", host),
+                        false => tracing::debug!("blocked host: {}", host),
+                    }
+                }
+            }
         }
+        poll
     }
 }
 
 /// Extract the authority (host) from the request headers based on the layer
 /// configuration.
-fn get_authority(headers: &HeaderMap, layer: &AllowedHostLayer) -> Option<Authority> {
+fn get_authority<M>(headers: &HeaderMap, layer: &AllowedHostLayer<M>) -> Option<Authority> {
     // Attempt to extract host from Forwarded headers
     if layer.use_forwarded {
         if let Some(authority) = extract_from_forwarded(headers, layer.reject_multiple_hosts) {
