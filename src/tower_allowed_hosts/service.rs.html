@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/service.rs`."><title>service.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-6d8951b3ccd3cbca.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tower_allowed_hosts" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (eb4e23467 2024-10-09)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">tower_allowed_hosts/</div>service.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/service.rs`."><title>service.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-49344e4802b2d48a.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tower_allowed_hosts" data-themes="" data-resource-suffix="" data-rustdoc-version="1.83.0-nightly (52fd99839 2024-10-10)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">tower_allowed_hosts/</div>service.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -358,7 +358,33 @@
 <a href="#357" id="357">357</a>
 <a href="#358" id="358">358</a>
 <a href="#359" id="359">359</a>
-<a href="#360" id="360">360</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
 <span class="kw">use </span>std::task::{Context, Poll};
 
@@ -372,28 +398,36 @@
 <span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
 </span><span class="kw">use </span>wildmatch::WildMatch;
 
-<span class="kw">use </span><span class="kw">crate</span>::Host;
 <span class="kw">use </span><span class="kw">crate</span>::error::Error;
+<span class="kw">use </span><span class="kw">crate</span>::Host;
 
 <span class="kw">const </span>X_FORWARDED_HOST_HEADER_KEY: <span class="kw-2">&amp;</span>str = <span class="string">"X-Forwarded-Host"</span>;
 
 <span class="kw">type </span>BoxError = Box&lt;<span class="kw">dyn </span>std::error::Error + Send + Sync&gt;;
 
-<span class="doccomment">/// Allowed hosts layer to check if provided host is valid or not
+<span class="doccomment">/// Allowed hosts layer to check if the provided host is valid.
 ///
-/// Hostname is resolved through the following, in order:
-/// - `Forwarded` header (if `use_forwarded` is true. Default value is false)
-/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true. Default
-///   value is false)
+/// The hostname is resolved through the following, in order:
+/// - `Forwarded` header (if `use_forwarded` is true)
+/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true)
 /// - `Host` header
 ///
-/// Determined host are always lowercase so use lowercase value when creating
-/// allowed host layer otherwise layer may reject host and block request
+/// Determined hosts are always lowercase. Ensure to use lowercase values when
+/// creating the allowed host layer to avoid unintended request blocking.
 ///
-/// By default, all headers will get first host value for analyzing if any
-/// headers contains multiple header value than subsequent value gets ignored
-/// if you want to reject multiple hosts than you have to enable reject multiple
-/// hosts settings
+/// By default, the first host value from the headers is used. If multiple
+/// host values are present, subsequent values are ignored unless
+/// `reject_multiple_hosts` is enabled, which will reject the request.
+///
+/// # Examples
+///
+/// ```rust
+/// use tower_allowed_hosts::AllowedHostLayer;
+/// let layer = AllowedHostLayer::default()
+///     .extend(["example.com", "api.example.com"])
+///     .set_use_forwarded(true)
+///     .set_reject_multiple_hosts(true);
+/// ```
 </span><span class="attr">#[derive(Clone, Default)]
 </span><span class="kw">pub struct </span>AllowedHostLayer {
     allowed_hosts: Vec&lt;String&gt;,
@@ -407,12 +441,13 @@
 }
 
 <span class="kw">impl </span>AllowedHostLayer {
-    <span class="doccomment">/// Extend allowed hosts list using normal string. To match host value
-    /// should be same as given value case sensitive
+    <span class="doccomment">/// Extend allowed hosts list using exact string matches.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().extend(["127.0.0.1"]);
+    /// let layer = AllowedHostLayer::default().extend(["127.0.0.1", "localhost"]);
     /// ```
     </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>extend&lt;I, T&gt;(<span class="kw-2">mut </span><span class="self">self</span>, hosts: I) -&gt; <span class="self">Self
@@ -424,14 +459,16 @@
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Extend allowed hosts list using wildcard.
+    <span class="doccomment">/// Extend allowed hosts list using wildcard patterns.
     /// - `?` matches exactly one occurrence of any character.
     /// - `*` matches arbitrary many (including zero) occurrences of any
     ///   character.
     ///
+    /// # Examples
+    ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().extend_wildcard(["*.example.com"]);
+    /// let layer = AllowedHostLayer::default().extend_wildcard(["*.example.com"]);
     /// ```
     </span><span class="attr">#[must_use]
     #[cfg(feature = <span class="string">"wildcard"</span>)]
@@ -445,13 +482,17 @@
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Extend allowed hosts list using regex. Regex is check to verify if
-    /// header is allowed or not
+    <span class="doccomment">/// Extend allowed hosts list using regular expressions.
+    ///
+    /// # Examples
     ///
     /// ```rust
+    /// use regex::Regex;
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::default();
-    /// let _ = layer.extend_regex([regex::Regex::new("^127.0.0.1$").unwrap()]);
+    /// let layer = AllowedHostLayer::default().extend_regex([
+    ///     Regex::new(r"^127\.0\.0\.1$").unwrap(),
+    ///     Regex::new(r"^localhost$").unwrap(),
+    /// ]);
     /// ```
     </span><span class="attr">#[must_use]
     #[cfg(feature = <span class="string">"regex"</span>)]
@@ -459,17 +500,17 @@
     </span><span class="kw">where
         </span>I: IntoIterator&lt;Item = Regex&gt;,
     {
-        <span class="self">self</span>.allowed_hosts_regex
-            .extend(hosts.into_iter().map(Into::into));
+        <span class="self">self</span>.allowed_hosts_regex.extend(hosts);
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Set `use_forwarded` to provided value. If it is set to true than
-    /// `Forwarded` header is used
+    <span class="doccomment">/// Enable or disable the use of the `Forwarded` header.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_use_forwarded(true);
+    /// let layer = AllowedHostLayer::default().set_use_forwarded(true);
     /// ```
     </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>set_use_forwarded(<span class="kw-2">mut </span><span class="self">self</span>, use_forwarded: bool) -&gt; <span class="self">Self </span>{
@@ -477,12 +518,13 @@
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Set `use_x_forwarded_host` to provided value. If it is set to true than
-    /// `X-Forwarded-Host` header is used
+    <span class="doccomment">/// Enable or disable the use of the `X-Forwarded-Host` header.
+    ///
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_use_x_forwarded_host(true);
+    /// let layer = AllowedHostLayer::default().set_use_x_forwarded_host(true);
     /// ```
     </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>set_use_x_forwarded_host(<span class="kw-2">mut </span><span class="self">self</span>, use_x_forwarded_host: bool) -&gt; <span class="self">Self </span>{
@@ -490,53 +532,54 @@
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Reject request if one header have multiple host.
+    <span class="doccomment">/// Configure the layer to reject requests with multiple host values in a
+    /// single header.
     ///
-    /// For example if there are two `HOST` header than it will reject such
-    /// request since server cannot determine which header to use for
-    /// validation. Default value of this is false and it will get first
-    /// value and will not reject request if multiple host is present for
-    /// one header
+    /// # Examples
     ///
     /// ```rust
     /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let _ = AllowedHostLayer::default().set_reject_multiple_hosts(true);
+    /// let layer = AllowedHostLayer::default().set_reject_multiple_hosts(true);
     /// ```
     </span><span class="attr">#[must_use]
-    </span><span class="kw">pub fn </span>set_reject_multiple_hosts(<span class="kw-2">mut </span><span class="self">self</span>, reject_multiple_hosts: bool) -&gt; <span class="self">Self </span>{
-        <span class="self">self</span>.reject_multiple_hosts = reject_multiple_hosts;
+    </span><span class="kw">pub fn </span>set_reject_multiple_hosts(<span class="kw-2">mut </span><span class="self">self</span>, reject: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.reject_multiple_hosts = reject;
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// check if authority i.e host is allowed or not. Convert host to lowercase
-    /// value than check with provided value
+    <span class="doccomment">/// Check if the provided authority (host) is allowed.
+    ///
+    /// The host is converted to lowercase before matching.
     </span><span class="kw">fn </span>is_host_allowed(<span class="kw-2">&amp;</span><span class="self">self</span>, authority: <span class="kw-2">&amp;</span>Authority) -&gt; bool {
         <span class="kw">let </span>host = authority.as_str().to_ascii_lowercase();
 
-        <span class="kw">if </span><span class="self">self
-            </span>.allowed_hosts
-            .iter()
-            .any(|allowed_host| allowed_host == <span class="kw-2">&amp;</span>host)
-        {
+        <span class="comment">// Exact match using HashSet for O(1) lookup
+        </span><span class="kw">if </span><span class="self">self</span>.allowed_hosts.contains(<span class="kw-2">&amp;</span>host) {
             <span class="kw">return </span><span class="bool-val">true</span>;
         }
 
-        <span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
-        </span><span class="kw">if </span><span class="self">self
-            </span>.allowed_hosts_wildcard
-            .iter()
-            .any(|allowed_host_wildcard| allowed_host_wildcard.matches(<span class="kw-2">&amp;</span>host))
-        {
-            <span class="kw">return </span><span class="bool-val">true</span>;
+        <span class="comment">// Wildcard match
+        </span><span class="attr">#[cfg(feature = <span class="string">"wildcard"</span>)]
+        </span>{
+            <span class="kw">if </span><span class="self">self
+                </span>.allowed_hosts_wildcard
+                .iter()
+                .any(|pattern| pattern.matches(<span class="kw-2">&amp;</span>host))
+            {
+                <span class="kw">return </span><span class="bool-val">true</span>;
+            }
         }
 
-        <span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
-        </span><span class="kw">if </span><span class="self">self
-            </span>.allowed_hosts_regex
-            .iter()
-            .any(|allowed_host_regex| allowed_host_regex.is_match(<span class="kw-2">&amp;</span>host))
-        {
-            <span class="kw">return </span><span class="bool-val">true</span>;
+        <span class="comment">// Regex match
+        </span><span class="attr">#[cfg(feature = <span class="string">"regex"</span>)]
+        </span>{
+            <span class="kw">if </span><span class="self">self
+                </span>.allowed_hosts_regex
+                .iter()
+                .any(|regex| regex.is_match(<span class="kw-2">&amp;</span>host))
+            {
+                <span class="kw">return </span><span class="bool-val">true</span>;
+            }
         }
 
         <span class="bool-val">false
@@ -554,12 +597,14 @@
     }
 }
 
-<span class="doccomment">/// Allowed hosts service
+<span class="doccomment">/// Allowed hosts service that wraps the inner service and validates the request
+/// host.
 </span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>AllowedHost&lt;S&gt; {
     inner: S,
     layer: AllowedHostLayer,
 }
+
 <span class="kw">impl</span>&lt;S, ReqBody&gt; Service&lt;Request&lt;ReqBody&gt;&gt; <span class="kw">for </span>AllowedHost&lt;S&gt;
 <span class="kw">where
     </span>S: Service&lt;Request&lt;ReqBody&gt;&gt;,
@@ -573,34 +618,33 @@
         <span class="self">self</span>.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    <span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>req: Request&lt;ReqBody&gt;) -&gt; <span class="self">Self</span>::Future {
+    <span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, req: Request&lt;ReqBody&gt;) -&gt; <span class="self">Self</span>::Future {
         <span class="kw">let </span>host = get_authority(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer);
-        <span class="kw">let </span>host_allowed = host.clone().is_some_and(|h| <span class="self">self</span>.layer.is_host_allowed(<span class="kw-2">&amp;</span>h));
-        <span class="comment">// if there is any host value and that host value is allowed than add extension
-        // to request
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(host_val) = <span class="kw-2">&amp;</span>host {
+        <span class="kw">let </span>host_allowed = host.as_ref().is_some_and(|h| <span class="self">self</span>.layer.is_host_allowed(h));
+
+        <span class="comment">// If the host is allowed, insert it into the request extensions
+        </span><span class="kw">let </span><span class="kw-2">mut </span>req = req;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>host_val) = host {
             <span class="kw">if </span>host_allowed {
                 req.extensions_mut().insert(Host(host_val.clone()));
             }
         }
-        <span class="kw">let </span>response_future = <span class="self">self</span>.inner.call(req);
+
         AllowedHostFuture {
-            response_future,
+            response_future: <span class="self">self</span>.inner.call(req),
             host,
             host_allowed,
         }
     }
 }
 
-<span class="doccomment">/// Future for Allowed hosts
+<span class="doccomment">/// Future for AllowedHost service.
 </span><span class="attr">#[pin_project::pin_project]
 </span><span class="kw">pub struct </span>AllowedHostFuture&lt;F&gt; {
     <span class="attr">#[pin]
     </span>response_future: F,
-    <span class="attr">#[pin]
-    </span>host: <span class="prelude-ty">Option</span>&lt;Authority&gt;,
-    <span class="attr">#[pin]
-    </span>host_allowed: bool,
+    host: <span class="prelude-ty">Option</span>&lt;Authority&gt;,
+    host_allowed: bool,
 }
 
 <span class="kw">impl</span>&lt;F, Response, E&gt; Future <span class="kw">for </span>AllowedHostFuture&lt;F&gt;
@@ -611,111 +655,119 @@
     <span class="kw">type </span>Output = <span class="prelude-ty">Result</span>&lt;Response, BoxError&gt;;
 
     <span class="kw">fn </span>poll(<span class="self">self</span>: Pin&lt;<span class="kw-2">&amp;mut </span><span class="self">Self</span>&gt;, cx: <span class="kw-2">&amp;mut </span>Context&lt;<span class="lifetime">'_</span>&gt;) -&gt; Poll&lt;<span class="self">Self</span>::Output&gt; {
-        <span class="kw">let </span>project = <span class="self">self</span>.project();
-        <span class="kw">let </span><span class="prelude-val">Some</span>(host) = <span class="kw-2">&amp;*</span>project.host <span class="kw">else </span>{
-            <span class="kw">let </span>err = Box::new(Error::FailedToResolveHost);
-            <span class="kw">return </span>Poll::Ready(<span class="prelude-val">Err</span>(err));
-        };
-        <span class="kw">if </span>!<span class="kw-2">*</span>project.host_allowed {
-            <span class="attr">#[cfg(feature = <span class="string">"tracing"</span>)]
-            </span><span class="macro">tracing::debug!</span>(<span class="string">"blocked host: {host}"</span>);
-            <span class="kw">let </span>err = Box::new(Error::HostNotAllowed(host.to_string()));
-            <span class="kw">return </span>Poll::Ready(<span class="prelude-val">Err</span>(err));
-        }
-        <span class="attr">#[cfg(feature = <span class="string">"tracing"</span>)]
-        </span><span class="macro">tracing::debug!</span>(<span class="string">"allowed host: {host}"</span>);
+        <span class="kw">let </span>this = <span class="self">self</span>.project();
 
-        <span class="kw">match </span>project.response_future.poll(cx) {
-            Poll::Ready(result) =&gt; Poll::Ready(result.map_err(Into::into)),
-            Poll::Pending =&gt; Poll::Pending,
+        <span class="kw">match </span>(<span class="kw-2">&amp;</span>this.host, this.host_allowed) {
+            (<span class="prelude-val">Some</span>(host), <span class="bool-val">true</span>) =&gt; {
+                <span class="attr">#[cfg(feature = <span class="string">"tracing"</span>)]
+                </span><span class="macro">tracing::debug!</span>(<span class="string">"allowed host: {}"</span>, host);
+                <span class="comment">// Proceed to poll the inner future
+                </span><span class="kw">match </span>this.response_future.poll(cx) {
+                    Poll::Ready(result) =&gt; Poll::Ready(result.map_err(Into::into)),
+                    Poll::Pending =&gt; Poll::Pending,
+                }
+            }
+            (<span class="prelude-val">Some</span>(host), <span class="bool-val">false</span>) =&gt; {
+                <span class="attr">#[cfg(feature = <span class="string">"tracing"</span>)]
+                </span><span class="macro">tracing::debug!</span>(<span class="string">"blocked host: {}"</span>, host);
+                Poll::Ready(<span class="prelude-val">Err</span>(Box::new(Error::HostNotAllowed(host.to_string()))))
+            }
+            (<span class="prelude-val">None</span>, <span class="kw">_</span>) =&gt; Poll::Ready(<span class="prelude-val">Err</span>(Box::new(Error::FailedToResolveHost))),
         }
     }
 }
 
-<span class="doccomment">/// get host from different supported header name
+<span class="doccomment">/// Extract the authority (host) from the request headers based on the layer
+/// configuration.
 </span><span class="kw">fn </span>get_authority(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
-    <span class="kw">let </span>host_str = get_host_str(headers, layer)<span class="question-mark">?</span>;
-    <span class="kw">let </span>uri = host_str.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
-    <span class="comment">// if uri contains path, scheme or query than return None for uri since it is
-    // not valid `HOST` header
-    </span><span class="kw">if </span>!uri.path().is_empty() || uri.query().is_some() || uri.scheme().is_some() {
-        <span class="kw">return </span><span class="prelude-val">None</span>;
+    <span class="comment">// Attempt to extract host from Forwarded headers
+    </span><span class="kw">if </span>layer.use_forwarded {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(authority) = extract_from_forwarded(headers, layer.reject_multiple_hosts) {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(authority);
+        }
     }
 
-    <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
-    <span class="comment">// if authority string form contains @ than its not valid host header since
-    // credentials part are present in host which make it invalid so returns None
-    </span><span class="kw">if </span>authority.as_str().contains(<span class="string">'@'</span>) {
-        <span class="kw">return </span><span class="prelude-val">None</span>;
+    <span class="comment">// Attempt to extract host from X-Forwarded-Host headers
+    </span><span class="kw">if </span>layer.use_x_forwarded_host {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(authority) = extract_from_x_forwarded_host(headers, layer.reject_multiple_hosts)
+        {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(authority);
+        }
     }
-    <span class="prelude-val">Some</span>(authority.clone())
+
+    <span class="comment">// Fallback to Host headers
+    </span>extract_from_host(headers, layer.reject_multiple_hosts)
 }
 
-<span class="kw">fn </span>get_host_str(headers: <span class="kw-2">&amp;</span>HeaderMap, layer: <span class="kw-2">&amp;</span>AllowedHostLayer) -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-    <span class="comment">// get `Forwarded` header value
-    </span><span class="kw">if </span>layer.use_forwarded {
-        <span class="kw">let </span>forwarded_headers = headers.get_all(FORWARDED);
-        <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = <span class="macro">vec!</span>[];
-        <span class="kw">for </span>forwarded_header <span class="kw">in </span>forwarded_headers {
-            <span class="kw">let </span>header_str = forwarded_header.to_str().ok()<span class="question-mark">?</span>;
-            <span class="kw">let </span>splitted_headers = header_str.split(<span class="string">','</span>);
-            <span class="kw">for </span>header <span class="kw">in </span>splitted_headers {
-                <span class="kw">let </span>header_parts = header.split(<span class="string">';'</span>);
-                <span class="kw">for </span>header_part <span class="kw">in </span>header_parts {
-                    <span class="kw">let </span>(key, value) = header_part.split_once(<span class="string">'='</span>)<span class="question-mark">?</span>;
-                    <span class="kw">if </span>key.trim().to_ascii_lowercase() == <span class="string">"host" </span>{
-                        obtained_hosts.push(value.trim().trim_matches(<span class="string">'"'</span>));
+<span class="doccomment">/// Extract host from Forwarded headers.
+</span><span class="kw">fn </span>extract_from_forwarded(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = Vec::new();
+
+    <span class="kw">for </span>forwarded_header <span class="kw">in </span>headers.get_all(FORWARDED) {
+        <span class="kw">let </span>header_str = forwarded_header.to_str().ok()<span class="question-mark">?</span>;
+        <span class="kw">for </span>header <span class="kw">in </span>header_str.split(<span class="string">','</span>) {
+            <span class="kw">for </span>part <span class="kw">in </span>header.split(<span class="string">';'</span>) {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((key, value)) = part.split_once(<span class="string">'='</span>) {
+                    <span class="kw">if </span>key.trim().eq_ignore_ascii_case(<span class="string">"host"</span>) {
+                        obtained_hosts.push(value.trim().trim_matches(<span class="string">'"'</span>).to_string());
                     }
                 }
             }
         }
-        <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts_iter = obtained_hosts.iter();
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>host) = obtained_hosts_iter.next() {
-            <span class="kw">if </span>layer.reject_multiple_hosts &amp;&amp; obtained_hosts_iter.next().is_some() {
-                <span class="kw">return </span><span class="prelude-val">None</span>;
-            }
-            <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
-        }
     }
 
-    <span class="comment">// get `x-forwarded-host` value
-    </span><span class="kw">if </span>layer.use_x_forwarded_host {
-        <span class="kw">let </span>x_forwarded_headers = headers.get_all(X_FORWARDED_HOST_HEADER_KEY);
-        <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = <span class="macro">vec!</span>[];
-        <span class="kw">for </span>x_forwarded_header <span class="kw">in </span>x_forwarded_headers {
-            <span class="kw">let </span>header_str = x_forwarded_header.to_str().ok()<span class="question-mark">?</span>;
-            <span class="kw">let </span>splitted_headers = header_str.split(<span class="string">','</span>);
-            <span class="kw">for </span>splitted_header <span class="kw">in </span>splitted_headers {
-                obtained_hosts.push(splitted_header);
-            }
-        }
-        <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts_iter = obtained_hosts.iter();
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>host) = obtained_hosts_iter.next() {
-            <span class="kw">if </span>layer.reject_multiple_hosts &amp;&amp; obtained_hosts_iter.next().is_some() {
-                <span class="kw">return </span><span class="prelude-val">None</span>;
-            }
-            <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
-        }
+    validate_and_parse_hosts(<span class="kw-2">&amp;</span>obtained_hosts, reject_multiple)
+}
+
+<span class="doccomment">/// Extract host from X-Forwarded-Host headers.
+</span><span class="kw">fn </span>extract_from_x_forwarded_host(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = Vec::new();
+
+    <span class="kw">for </span>header <span class="kw">in </span>headers.get_all(X_FORWARDED_HOST_HEADER_KEY) {
+        <span class="kw">let </span>header_str = header.to_str().ok()<span class="question-mark">?</span>;
+        obtained_hosts.extend(header_str.split(<span class="string">','</span>).map(|s| s.trim().to_string()));
     }
 
-    <span class="comment">// get host header value.
-    </span><span class="kw">let </span>host_headers = headers.get_all(HOST);
-    <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = <span class="macro">vec!</span>[];
-    <span class="kw">for </span>host_header <span class="kw">in </span>host_headers {
+    validate_and_parse_hosts(<span class="kw-2">&amp;</span>obtained_hosts, reject_multiple)
+}
+
+<span class="doccomment">/// Extract host from Host headers.
+</span><span class="kw">fn </span>extract_from_host(headers: <span class="kw-2">&amp;</span>HeaderMap, reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts = Vec::new();
+
+    <span class="kw">for </span>host_header <span class="kw">in </span>headers.get_all(HOST) {
         <span class="kw">let </span>header_str = host_header.to_str().ok()<span class="question-mark">?</span>;
-        <span class="kw">let </span>splitted_headers = header_str.split(<span class="string">','</span>);
-        <span class="kw">for </span>splitted_header <span class="kw">in </span>splitted_headers {
-            obtained_hosts.push(splitted_header);
-        }
-    }
-    <span class="kw">let </span><span class="kw-2">mut </span>obtained_hosts_iter = obtained_hosts.iter();
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>host) = obtained_hosts_iter.next() {
-        <span class="kw">if </span>layer.reject_multiple_hosts &amp;&amp; obtained_hosts_iter.next().is_some() {
-            <span class="kw">return </span><span class="prelude-val">None</span>;
-        }
-        <span class="kw">return </span><span class="prelude-val">Some</span>(host.to_string());
+        obtained_hosts.extend(header_str.split(<span class="string">','</span>).map(|s| s.trim().to_string()));
     }
 
-    <span class="prelude-val">None
-</span>}
+    validate_and_parse_hosts(<span class="kw-2">&amp;</span>obtained_hosts, reject_multiple)
+}
+
+<span class="doccomment">/// Validate the extracted hosts and parse the first valid authority.
+/// If `reject_multiple` is true and multiple hosts are present, return None.
+</span><span class="kw">fn </span>validate_and_parse_hosts(obtained_hosts: <span class="kw-2">&amp;</span>[String], reject_multiple: bool) -&gt; <span class="prelude-ty">Option</span>&lt;Authority&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>hosts_iter = obtained_hosts.iter();
+
+    <span class="kw">let </span>first_host = hosts_iter.next()<span class="question-mark">?</span>;
+    <span class="kw">if </span>reject_multiple &amp;&amp; hosts_iter.next().is_some() {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
+
+    <span class="kw">let </span>uri = first_host.parse::&lt;Uri&gt;().ok()<span class="question-mark">?</span>;
+
+    <span class="kw">if </span>(uri.path() != <span class="string">"/" </span>&amp;&amp; !uri.path().is_empty())
+        || uri.query().is_some()
+        || uri.scheme().is_some()
+    {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
+
+    <span class="kw">let </span>authority = uri.authority()<span class="question-mark">?</span>;
+    <span class="comment">// Ensure authority does not contain user info
+    </span><span class="kw">if </span>authority.as_str().contains(<span class="string">'@'</span>) {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
+
+    <span class="prelude-val">Some</span>(authority.clone())
+}
 </code></pre></div></section></main></body></html>
