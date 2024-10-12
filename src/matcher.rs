@@ -5,7 +5,7 @@ use wildmatch::WildMatchPattern;
 
 /// Trait for matcher
 pub trait Matcher {
-    /// Check if provided host value gets match or not
+    /// Check if provided host value matches with matcher
     fn matches_host(&self, host: &str) -> bool;
 }
 

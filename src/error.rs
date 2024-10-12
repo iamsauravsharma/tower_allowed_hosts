@@ -6,6 +6,6 @@ pub enum Error {
     #[error("failed to resolve host")]
     FailedToResolveHost,
     /// error raised when host is not allowed
-    #[error("host not allowed")]
+    #[error("host {0} not allowed")]
     HostNotAllowed(String),
 }

@@ -1,5 +1,14 @@
-//! Crate which provides allowed hosts layer for tower based service where all
-//! non allowed hosts request are blocked
+//! Crate which provides allowed hosts layer for tower based service
+//!
+//! To use crate with any service you can create layer with any matcher
+//!
+//! # Examples
+//! ```rust
+//! let layer = tower_allowed_hosts::AllowedHostLayer::new(["127.0.0.1", "localhost"]);
+//! ```
+//!
+//! Check `README.MD` or documentation of [`AllowedHostLayer`] for more detailed
+//! information
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[doc(inline)]
