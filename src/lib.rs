@@ -5,7 +5,7 @@
 //! # Examples
 //! ```rust
 //! let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
-//!     .extend_allowed_hosts(vec!["example.com"]);
+//!     .extend_hosts(vec!["example.com"]);
 //! ```
 //!
 //! Check `README.MD` or documentation of [`AllowedHostLayer`] for more detailed

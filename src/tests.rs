@@ -21,9 +21,9 @@ async fn inner_svc(_: Request<BoxBody>) -> Result<Response<BoxBody>, Infallible>
 
 #[tokio::test]
 async fn normal() {
-    let allowed_host_layer: AllowedHostLayer<String, &str> = AllowedHostLayer::<_, &str>::default()
-        .extend_allowed_hosts(["127.0.0.1".to_string()])
-        .extend_allowed_forwarded_token_value([("signature".to_string(), "random_value")]);
+    let allowed_host_layer = AllowedHostLayer::default()
+        .extend_hosts(["127.0.0.1".to_string()])
+        .extend_forwarded_token_values([("signature", "random_value")]);
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -103,8 +103,8 @@ async fn normal() {
 #[cfg(feature = "wildcard")]
 #[tokio::test]
 async fn wildcard() {
-    let allowed_host_layer = AllowedHostLayer::<_, String>::default()
-        .push_allowed_hosts(wildmatch::WildMatch::new("127.0.0.?"));
+    let allowed_host_layer =
+        AllowedHostLayer::<_, String>::default().push_host(wildmatch::WildMatch::new("127.0.0.?"));
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -148,7 +148,7 @@ async fn wildcard() {
 #[tokio::test]
 async fn regex() {
     let allowed_host_layer = AllowedHostLayer::<_, String>::default()
-        .push_allowed_hosts(regex::Regex::new("^[a-z]+.example.com$").unwrap());
+        .push_host(regex::Regex::new("^[a-z]+.example.com$").unwrap());
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;

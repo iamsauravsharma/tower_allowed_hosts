@@ -26,7 +26,7 @@ To restrict access to specific basic hosts, you can use the following code:
 
 ```rust
 let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
-    .extend_allowed_hosts(&["127.0.0.1".to_string()]);
+    .extend_hosts(&["127.0.0.1".to_string()]);
 ```
 
 ### Wildcard
@@ -42,7 +42,7 @@ You can then restrict hosts using wildcards:
 
 ```rust
 let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
-    .extend_allowed_hosts(&[wildmatch::WildMatch::new("127.0.0.*")]);
+    .extend_hosts(&[wildmatch::WildMatch::new("127.0.0.*")]);
 ```
 
 ### Regex
@@ -77,7 +77,7 @@ fn router() -> Router {
     let handle_error_layer = HandleErrorLayer::new(handle_box_error);
 
     let allowed_hosts_layer = AllowedHostLayer::default()
-        .extend_allowed_hosts(&[wildmatch::WildMatch::new("127.0.0.*")]);
+        .extend_hosts(&[wildmatch::WildMatch::new("127.0.0.*")]);
 
      let layer = ServiceBuilder::new()
         .layer(handle_error_layer)
