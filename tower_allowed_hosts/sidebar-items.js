@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["error","matcher","service"],"struct":["AllowedHostLayer","Host"],"trait":["Matcher"]};
+window.SIDEBAR_ITEMS = {"mod":["error","matcher","service"],"struct":["AllowedHostLayer","Host"]};
