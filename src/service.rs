@@ -1,15 +1,11 @@
+use std::collections::HashMap;
 use std::future::Future;
-#[cfg(feature = "cache")]
-use std::num::NonZeroUsize;
 use std::pin::Pin;
-#[cfg(feature = "cache")]
-use std::sync::{Arc, Mutex};
+use std::string::ToString;
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
 use http::{HeaderMap, Request};
-#[cfg(feature = "cache")]
-use lru::LruCache;
 use tower_layer::Layer;
 use tower_service::Service;
 
@@ -17,238 +13,75 @@ use crate::error::Error;
 use crate::matcher::Matcher;
 use crate::Host;
 
-const X_FORWARDED_HOST_HEADER_KEY: &str = "X-Forwarded-Host";
-
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// Allowed hosts layer to check if the provided host is valid.
 ///
-/// The hostname is resolved through the following, in order:
-/// - `Forwarded` header (if `use_forwarded` is true)
-/// - `X-Forwarded-Host` header (if `use_x_forwarded_host` is true)
-/// - `Host` header
+/// The hostname is resolved through `Forwarded` header and `Host` header
 ///
-/// By default, the first host value from the headers is used. If multiple
-/// host values are present, subsequent values are ignored unless
-/// `reject_multiple_hosts` is enabled, which will reject the request.
-///
-/// # Example
-///
-/// ```rust
-/// use tower_allowed_hosts::AllowedHostLayer;
-/// let layer = AllowedHostLayer::default()
-///     .extend(["example.com", "api.example.com"])
-///     .set_use_forwarded(true)
-///     .set_reject_multiple_hosts(true);
-/// ```
-///
-/// # Supporting Multiple Match Types
-/// To support matching against multiple types you can use an `enum` to wrap
-/// different matcher types and implement `Matcher` for that enum.
-///
-/// # Example with Enum
-/// ```rust
-/// use tower_allowed_hosts::Matcher;
-/// enum MultiMatcher {
-///     Exact(String),
-///     #[cfg(feature = "wildcard")]
-///     Wildcard(wildmatch::WildMatch),
-///     #[cfg(feature = "regex")]
-///     Regex(regex::Regex),
-/// }
-///
-/// impl Matcher for MultiMatcher {
-///     fn matches_host(&self, host: &str) -> bool {
-///         match self {
-///             MultiMatcher::Exact(value) => value.matches_host(host),
-///             #[cfg(feature = "wildcard")]
-///             MultiMatcher::Wildcard(pattern) => pattern.matches_host(host),
-///             #[cfg(feature = "regex")]
-///             MultiMatcher::Regex(regex) => regex.matches_host(host),
-///         }
-///     }
-/// }
-///
-/// let mut layer = tower_allowed_hosts::AllowedHostLayer::new([MultiMatcher::Exact(
-///     "example.com".to_string(),
-/// )])
-/// .set_use_forwarded(true)
-/// .set_reject_multiple_hosts(true);
-/// #[cfg(feature = "wildcard")]
-/// {
-///     layer = layer.push(MultiMatcher::Wildcard(wildmatch::WildMatch::new(
-///         "127.0.0.?",
-///     )));
-/// }
-/// #[cfg(feature = "regex")]
-/// {
-///     layer = layer.push(MultiMatcher::Regex(
-///         regex::Regex::new("^[a-z]+.example.com$").unwrap(),
-///     ));
-/// }
-/// ```
-#[derive(Clone, Default)]
-pub struct AllowedHostLayer<M> {
-    matchers: Vec<M>,
-    use_forwarded: bool,
-    use_x_forwarded_host: bool,
-    reject_multiple_hosts: bool,
-    #[cfg(feature = "cache")]
-    cache: Option<Arc<Mutex<LruCache<String, bool>>>>,
+/// If `allowed_forwarded_token_value` is non empty than host header are
+/// obtained from such forwarded value which have provided token
+#[derive(Clone)]
+pub struct AllowedHostLayer<H, F> {
+    allowed_hosts: Vec<H>,
+    allowed_forwarded_token_value: Vec<(String, F)>,
 }
 
-impl<M> AllowedHostLayer<M>
+impl<H, F> Default for AllowedHostLayer<H, F> {
+    fn default() -> Self {
+        Self {
+            allowed_hosts: vec![],
+            allowed_forwarded_token_value: vec![],
+        }
+    }
+}
+
+impl<H, F> AllowedHostLayer<H, F>
 where
-    M: Matcher,
+    H: Matcher,
+    F: Matcher,
 {
-    /// Create new allowed hosts layer with provided matchers
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::new(vec!["127.0.0.1".to_string()]);
-    /// ```
-    #[must_use]
-    pub fn new<I>(matchers: I) -> Self
-    where
-        I: IntoIterator<Item = M>,
-    {
-        Self {
-            matchers: matchers.into_iter().collect(),
-            use_forwarded: false,
-            use_x_forwarded_host: false,
-            reject_multiple_hosts: false,
-            #[cfg(feature = "cache")]
-            cache: None,
-        }
-    }
-
-    /// Create new allowed hosts layer with provided matchers and cap size
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::new_with_cache_cap(
-    ///     vec!["127.0.0.1".to_string()],
-    ///     std::num::NonZeroUsize::new(24).unwrap(),
-    /// );
-    /// ```
-    #[cfg(feature = "cache")]
-    #[must_use]
-    pub fn new_with_cache_cap<I>(matchers: I, cap: NonZeroUsize) -> Self
-    where
-        I: IntoIterator<Item = M>,
-    {
-        Self {
-            matchers: matchers.into_iter().collect(),
-            use_forwarded: false,
-            use_x_forwarded_host: false,
-            reject_multiple_hosts: false,
-            cache: Some(Arc::new(Mutex::new(LruCache::new(cap)))),
-        }
-    }
-
     /// Add a matcher to allowed hosts layer
     #[must_use]
-    pub fn push(mut self, matcher: M) -> Self {
-        self.matchers.push(matcher);
+    pub fn push_allowed_hosts(mut self, matcher: H) -> Self {
+        self.allowed_hosts.push(matcher);
         self
     }
 
     /// Extend allowed hosts layer with provided matchers
     #[must_use]
-    pub fn extend<I>(mut self, matchers: I) -> Self
+    pub fn extend_allowed_hosts<I>(mut self, matchers: I) -> Self
     where
-        I: IntoIterator<Item = M>,
+        I: IntoIterator<Item = H>,
     {
-        self.matchers.extend(matchers);
+        self.allowed_hosts.extend(matchers);
         self
     }
 
-    /// Set lru cache cap
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::<String>::default()
-    ///     .set_cap_size(std::num::NonZeroUsize::new(20).unwrap());
-    /// ```
-    #[cfg(feature = "cache")]
+    /// Add a matcher to allowed hosts layer
     #[must_use]
-    pub fn set_cap_size(mut self, cap: NonZeroUsize) -> Self {
-        self.cache = Some(Arc::new(Mutex::new(LruCache::new(cap))));
+    pub fn push_allowed_forwarded_token_value(mut self, matcher: (String, F)) -> Self {
+        self.allowed_forwarded_token_value.push(matcher);
         self
     }
 
-    /// Disable cache
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::<String>::default()
-    ///     .set_cap_size(std::num::NonZeroUsize::new(20).unwrap())
-    ///     .disable_cache();
-    /// ```
-    #[cfg(feature = "cache")]
+    /// Extend allowed hosts layer with provided matchers
     #[must_use]
-    pub fn disable_cache(mut self) -> Self {
-        self.cache = None;
-        self
-    }
-
-    /// Enable or disable the use of the `Forwarded` header.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::<String>::default().set_use_forwarded(true);
-    /// ```
-    #[must_use]
-    pub fn set_use_forwarded(mut self, use_forwarded: bool) -> Self {
-        self.use_forwarded = use_forwarded;
-        self
-    }
-
-    /// Enable or disable the use of the `X-Forwarded-Host` header.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::<&str>::default().set_use_x_forwarded_host(true);
-    /// ```
-    #[must_use]
-    pub fn set_use_x_forwarded_host(mut self, use_x_forwarded_host: bool) -> Self {
-        self.use_x_forwarded_host = use_x_forwarded_host;
-        self
-    }
-
-    /// Configure the layer to reject requests with multiple host values in a
-    /// single header.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use tower_allowed_hosts::AllowedHostLayer;
-    /// let layer = AllowedHostLayer::<String>::default().set_reject_multiple_hosts(true);
-    /// ```
-    #[must_use]
-    pub fn set_reject_multiple_hosts(mut self, reject: bool) -> Self {
-        self.reject_multiple_hosts = reject;
+    pub fn extend_allowed_forwarded_token_value<I>(mut self, matchers: I) -> Self
+    where
+        I: IntoIterator<Item = (String, F)>,
+    {
+        self.allowed_forwarded_token_value.extend(matchers);
         self
     }
 }
 
-impl<M, S> Layer<S> for AllowedHostLayer<M>
+impl<H, F, S> Layer<S> for AllowedHostLayer<H, F>
 where
-    M: Clone,
+    H: Clone,
+    F: Clone,
 {
-    type Service = AllowedHost<M, S>;
+    type Service = AllowedHost<H, F, S>;
 
     fn layer(&self, inner: S) -> Self::Service {
         Self::Service {
@@ -261,16 +94,17 @@ where
 /// Allowed hosts service that wraps the inner service and validates the request
 /// host.
 #[derive(Clone)]
-pub struct AllowedHost<M, S> {
+pub struct AllowedHost<H, F, S> {
     inner: S,
-    layer: AllowedHostLayer<M>,
+    layer: AllowedHostLayer<H, F>,
 }
 
-impl<M, S, ReqBody> Service<Request<ReqBody>> for AllowedHost<M, S>
+impl<H, F, S, ReqBody> Service<Request<ReqBody>> for AllowedHost<H, F, S>
 where
     S: Service<Request<ReqBody>>,
     S::Error: Into<BoxError>,
-    M: Matcher,
+    H: Matcher,
+    F: Matcher,
 {
     type Error = BoxError;
     type Future = AllowedHostFuture<S::Future>;
@@ -281,51 +115,31 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
-        if let Some(host_val) = get_host(req.headers(), &self.layer) {
-            #[cfg(feature = "cache")]
-            if let Some(cache) = &self.layer.cache {
-                if let Ok(mut mutex_guard) = cache.lock() {
-                    if let Some(&host_allowed) = mutex_guard.get(host_val.as_str()) {
-                        if host_allowed {
-                            req.extensions_mut().insert(Host(host_val.clone()));
-                        }
-                        return Self::Future {
-                            response_future: self.inner.call(req),
-                            host: Some(host_val),
-                            host_allowed,
-                        };
-                    }
+        match get_host(req.headers(), &self.layer.allowed_forwarded_token_value) {
+            Ok(host_val) => {
+                let host_allowed = self
+                    .layer
+                    .allowed_hosts
+                    .iter()
+                    .any(|host_matcher| host_matcher.matches_value(host_val.as_str()));
+
+                if host_allowed {
+                    req.extensions_mut().insert(Host(host_val.clone()));
+                }
+
+                Self::Future {
+                    response_future: self.inner.call(req),
+                    host: Ok(host_val),
+                    host_allowed,
                 }
             }
-
-            let host_allowed = self
-                .layer
-                .matchers
-                .iter()
-                .any(|m| m.matches_host(host_val.as_str()));
-
-            if host_allowed {
-                req.extensions_mut().insert(Host(host_val.clone()));
-            }
-
-            #[cfg(feature = "cache")]
-            if let Some(cache) = &self.layer.cache {
-                if let Ok(mut mutex_guard) = cache.lock() {
-                    mutex_guard.put(host_val.to_string(), host_allowed);
+            Err(err) => {
+                Self::Future {
+                    response_future: self.inner.call(req),
+                    host: Err(err),
+                    host_allowed: false,
                 }
             }
-            return Self::Future {
-                response_future: self.inner.call(req),
-                host: Some(host_val),
-                host_allowed,
-            };
-        }
-
-        // if no host is found than request is not allowed
-        AllowedHostFuture {
-            response_future: self.inner.call(req),
-            host: None,
-            host_allowed: false,
         }
     }
 }
@@ -335,7 +149,7 @@ where
 pub struct AllowedHostFuture<F> {
     #[pin]
     response_future: F,
-    host: Option<String>,
+    host: Result<String, Error>,
     host_allowed: bool,
 }
 
@@ -347,110 +161,102 @@ where
     type Output = Result<Response, BoxError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let host = self.host.clone();
         let this = self.project();
 
-        let poll = match (&this.host, &this.host_allowed) {
-            (Some(_), true) => {
+        match (host, &this.host_allowed) {
+            (Ok(allowed_host), true) => {
                 match this.response_future.poll(cx) {
-                    Poll::Ready(result) => Poll::Ready(result.map_err(Into::into)),
+                    Poll::Ready(result) => {
+                        #[cfg(feature = "tracing")]
+                        tracing::debug!("allowed host: {}", allowed_host);
+                        Poll::Ready(result.map_err(Into::into))
+                    }
                     Poll::Pending => Poll::Pending,
                 }
             }
-            (Some(host), false) => {
-                Poll::Ready(Err(Box::new(Error::HostNotAllowed(host.to_string())).into()))
+            (Ok(blocked_host), false) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("blocked host: {}", blocked_host);
+                Poll::Ready(Err(Box::new(Error::HostNotAllowed(blocked_host)).into()))
             }
-            (None, _) => Poll::Ready(Err(Box::new(Error::FailedToResolveHost).into())),
-        };
-        #[cfg(feature = "tracing")]
-        {
-            if let Some(host) = &this.host {
-                if poll.is_ready() {
-                    match this.host_allowed {
-                        true => tracing::debug!("allowed host: {}", host),
-                        false => tracing::debug!("blocked host: {}", host),
-                    }
-                }
+            (Err(err), _) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("{}", err);
+                Poll::Ready(Err(Box::new(err).into()))
             }
         }
-        poll
     }
 }
 
 /// Extract the host from the request headers based on the layer
 /// configuration.
-fn get_host<M>(headers: &HeaderMap, layer: &AllowedHostLayer<M>) -> Option<String> {
-    // Attempt to extract host from Forwarded headers
-    if layer.use_forwarded {
-        if let Some(authority) = extract_from_forwarded(headers, layer.reject_multiple_hosts) {
-            return Some(authority);
-        }
-    }
-
-    // Attempt to extract host from X-Forwarded-Host headers
-    if layer.use_x_forwarded_host {
-        if let Some(authority) = extract_from_x_forwarded_host(headers, layer.reject_multiple_hosts)
-        {
-            return Some(authority);
-        }
-    }
-
-    // Fallback to Host headers
-    extract_from_host(headers, layer.reject_multiple_hosts)
+fn get_host<F>(
+    headers: &HeaderMap,
+    allowed_forwarded_token_value: &[(String, F)],
+) -> Result<String, Error>
+where
+    F: Matcher,
+{
+    let host_header = match extract_from_forwarded(headers, allowed_forwarded_token_value)? {
+        Some(host) => host,
+        None => extract_from_host(headers)?,
+    };
+    Ok(host_header)
 }
 
-/// Extract host from Forwarded headers.
-fn extract_from_forwarded(headers: &HeaderMap, reject_multiple: bool) -> Option<String> {
-    let mut obtained_hosts = Vec::new();
+/// Extract host from Host headers.
+fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
+    let mut host_headers = headers.get_all(HOST).iter();
+    let first_host = host_headers.next().ok_or(Error::MissingHostHeader)?;
+    if host_headers.next().is_some() {
+        return Err(Error::MultipleHostHeader);
+    }
+    let host_str = first_host
+        .to_str()
+        .map_err(|_| Error::InvalidHostHeader)?
+        .to_string();
+    Ok(host_str)
+}
 
-    for forwarded_header in headers.get_all(FORWARDED) {
-        let header_str = forwarded_header.to_str().ok()?;
-        for header in header_str.split(',') {
-            for part in header.split(';') {
-                if let Some((key, value)) = part.split_once('=') {
-                    if key.trim().eq_ignore_ascii_case("host") {
-                        obtained_hosts.push(value.trim().trim_matches('"').to_string());
+/// Extract host from Forwarded headers only extract host header from allowed
+/// forwarded by values else return None
+fn extract_from_forwarded<F>(
+    headers: &HeaderMap,
+    allowed_forwarded_token_value: &[(String, F)],
+) -> Result<Option<String>, Error>
+where
+    F: Matcher,
+{
+    if !allowed_forwarded_token_value.is_empty() {
+        for forwarded_header in headers.get_all(FORWARDED) {
+            let header_str = forwarded_header
+                .to_str()
+                .map_err(|_| Error::InvalidForwardedHeader)?;
+            for header in header_str.split(',') {
+                let mut forwarded_token_value = HashMap::new();
+                for part in header.split(';') {
+                    if let Some((key, value)) = part.split_once('=') {
+                        forwarded_token_value.insert(key.to_string(), value.to_string());
+                    }
+                }
+                if let Some(host_value) = forwarded_token_value.get("host") {
+                    if allowed_forwarded_token_value.iter().any(
+                        |(allowed_forwarded_token, allowed_forwarded_value)| {
+                            if let Some(token_value) =
+                                forwarded_token_value.get(allowed_forwarded_token)
+                            {
+                                allowed_forwarded_value.matches_value(token_value)
+                            } else {
+                                false
+                            }
+                        },
+                    ) {
+                        return Ok(Some(host_value.to_string()));
                     }
                 }
             }
         }
     }
-
-    validate_and_parse_hosts(&obtained_hosts, reject_multiple)
-}
-
-/// Extract host from X-Forwarded-Host headers.
-fn extract_from_x_forwarded_host(headers: &HeaderMap, reject_multiple: bool) -> Option<String> {
-    let mut obtained_hosts = Vec::new();
-
-    for header in headers.get_all(X_FORWARDED_HOST_HEADER_KEY) {
-        let header_str = header.to_str().ok()?;
-        obtained_hosts.extend(header_str.split(',').map(|s| s.trim().to_string()));
-    }
-
-    validate_and_parse_hosts(&obtained_hosts, reject_multiple)
-}
-
-/// Extract host from Host headers.
-fn extract_from_host(headers: &HeaderMap, reject_multiple: bool) -> Option<String> {
-    let mut obtained_hosts = Vec::new();
-
-    for host_header in headers.get_all(HOST) {
-        let header_str = host_header.to_str().ok()?;
-        obtained_hosts.extend(header_str.split(',').map(|s| s.trim().to_string()));
-    }
-
-    validate_and_parse_hosts(&obtained_hosts, reject_multiple)
-}
-
-/// Validate the extracted hosts and get the first host else return None.
-/// If `reject_multiple` is true and multiple hosts are present, return None.
-fn validate_and_parse_hosts(obtained_hosts: &[String], reject_multiple: bool) -> Option<String> {
-    let mut hosts_iter = obtained_hosts.iter();
-
-    let first_host = hosts_iter.next()?;
-    if reject_multiple && hosts_iter.next().is_some() {
-        return None;
-    }
-
-    Some(first_host.clone())
+    Ok(None)
 }
