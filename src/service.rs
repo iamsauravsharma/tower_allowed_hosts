@@ -47,7 +47,7 @@ where
     H: Matcher,
     F: Matcher,
 {
-    /// Add a matcher to allowed hosts layer
+    /// Add a host to allowed hosts layer
     /// ```rust
     /// let layer =
     ///     tower_allowed_hosts::AllowedHostLayer::<_, String>::default().push_host("example.com");
@@ -58,7 +58,7 @@ where
         self
     }
 
-    /// Extend allowed hosts layer with provided matchers
+    /// Extend allowed hosts layer with provided hosts
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
     ///     .extend_hosts(vec!["example.com"]);
@@ -72,7 +72,7 @@ where
         self
     }
 
-    /// Add a matcher to allowed hosts layer
+    /// Add a forwarded header token value to allowed hosts layer
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
@@ -90,7 +90,7 @@ where
         self
     }
 
-    /// Extend allowed hosts layer with provided matchers
+    /// Extend allowed hosts layer with provided forwarded header token values
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
