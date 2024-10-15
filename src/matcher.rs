@@ -3,9 +3,18 @@ use regex::Regex;
 #[cfg(feature = "wildcard")]
 use wildmatch::WildMatchPattern;
 
-/// Trait for matcher
+/// Trait for checking if a given value matches a specific pattern.
+///
+/// `Matcher` trait is currently used in two places checking `Host` header as
+/// well as `Forwarded` header value. Both can have custom `Matcher` which
+/// differs from each others
+///
+/// The `Matcher` trait is designed to be highly versatile and extensible,
+/// allowing it to be implemented for a variety of pattern matching scenarios.
+/// Beyond simple string comparisons `Matcher` can be extended to support
+/// complex operations according to requirements
 pub trait Matcher {
-    /// Check if provided value value matches with matcher
+    /// Checks if provided value matches according to matcher
     fn matches_value(&self, value: &str) -> bool;
 }
 
