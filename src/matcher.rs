@@ -45,3 +45,30 @@ impl Matcher for Regex {
         self.is_match(value)
     }
 }
+
+impl<M> Matcher for Box<M>
+where
+    M: Matcher,
+{
+    fn matches_value(&self, value: &str) -> bool {
+        (**self).matches_value(value)
+    }
+}
+
+impl<M> Matcher for &M
+where
+    M: Matcher,
+{
+    fn matches_value(&self, value: &str) -> bool {
+        (**self).matches_value(value)
+    }
+}
+
+impl<M> Matcher for Vec<M>
+where
+    M: Matcher,
+{
+    fn matches_value(&self, value: &str) -> bool {
+        self.iter().all(|matcher| matcher.matches_value(value))
+    }
+}
