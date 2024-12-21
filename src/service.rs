@@ -16,12 +16,14 @@ use crate::Host;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
-/// Allowed hosts layer to check if the provided host is valid.
+/// Allowed hosts layer to validate and allow requests based on their host.
 ///
 /// The hostname is resolved through `Forwarded` header and `Host` header
 ///
-/// If `forwarded_token_value` is non empty than host header are
-/// obtained from such forwarded value which have provided token
+/// If `forwarded_token_value` is specified than hostname are  extract from such
+/// forwarded value which matches forwarded token value
+///
+/// # Examples
 ///
 /// ```rust
 /// let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
@@ -48,6 +50,9 @@ where
     F: Matcher,
 {
     /// Add a host to allowed hosts layer
+    ///
+    /// # Example
+    ///
     /// ```rust
     /// let layer =
     ///     tower_allowed_hosts::AllowedHostLayer::<_, String>::default().push_host("example.com");
@@ -59,6 +64,9 @@ where
     }
 
     /// Extend allowed hosts layer with provided hosts
+    ///
+    /// # Example
+    ///
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
     ///     .extend_hosts(vec!["example.com"]);
@@ -72,12 +80,18 @@ where
         self
     }
 
-    /// Add a forwarded header token value to allowed hosts layer
+    /// Add a token-value pair for matching in the `Forwarded` header.
+    ///
+    /// # Examples
+    ///
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
-    ///     .push_forwarded_token_value(["10", "random"]);
+    ///     .push_forwarded_token_value(("by", "random"));
     /// ```
+    ///
+    /// In above example only forwarded host name is extracted when host
+    /// forwarded header is present and by value matches to random as well
     #[must_use]
     pub fn push_forwarded_token_value<T, S>(mut self, matcher: T) -> Self
     where
@@ -91,6 +105,9 @@ where
     }
 
     /// Extend allowed hosts layer with provided forwarded header token values
+    ///
+    /// # Example
+    ///
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
@@ -239,7 +256,7 @@ where
     Ok(host_header)
 }
 
-/// Extract host from Host headers.
+/// Extract host from `Host` headers.
 fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
     let mut host_headers = headers.get_all(HOST).iter();
     let first_host = host_headers.next().ok_or(Error::MissingHostHeader)?;
@@ -253,7 +270,7 @@ fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
     Ok(host_str)
 }
 
-/// Extract host from Forwarded headers only extract host header from allowed
+/// Extract host from `Forwarded` headers only extract host header from allowed
 /// forwarded by values else return None
 fn extract_from_forwarded<F>(
     headers: &HeaderMap,

@@ -6,8 +6,7 @@
 | :--------------------------------------------: | :---------------------------------------: | :----------------------------------: |
 | [![License: MIT][license_badge]][license_link] | [![Crate][cratesio_badge]][cratesio_link] | [![Docs][docsrs_badge]][docsrs_link] |
 
-Tower service which limits request from only specified hosts
-All hostnames are automatically converted to lowercase before matching.
+Tower service which limits request from only specified hosts.
 
 ## Add as dependencies
 
