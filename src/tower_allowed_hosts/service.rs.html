@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/service.rs`."><title>service.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-b0742ba02757f159.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tower_allowed_hosts" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (9322d183f 2024-10-14)" data-channel="nightly" data-search-js="search-e056c65ede92db13.js" data-settings-js="settings-805db61a62df4bd2.js" ><script src="../../static.files/storage-1d39b6787ed640ff.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f070b9041d14864c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-0111fcff984fae8f.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">tower_allowed_hosts/</div>service.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/service.rs`."><title>service.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-46132b98.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tower_allowed_hosts" data-themes="" data-resource-suffix="" data-rustdoc-version="1.85.0-nightly (5f23ef7d3 2024-12-20)" data-channel="nightly" data-search-js="search-036cda7a.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">tower_allowed_hosts/</div>service.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -291,7 +291,24 @@
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::convert::Into;
 <span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
@@ -309,12 +326,14 @@
 
 <span class="kw">type </span>BoxError = Box&lt;<span class="kw">dyn </span>std::error::Error + Send + Sync&gt;;
 
-<span class="doccomment">/// Allowed hosts layer to check if the provided host is valid.
+<span class="doccomment">/// Allowed hosts layer to validate and allow requests based on their host.
 ///
 /// The hostname is resolved through `Forwarded` header and `Host` header
 ///
-/// If `forwarded_token_value` is non empty than host header are
-/// obtained from such forwarded value which have provided token
+/// If `forwarded_token_value` is specified than hostname are  extract from such
+/// forwarded value which matches forwarded token value
+///
+/// # Examples
 ///
 /// ```rust
 /// let layer = tower_allowed_hosts::AllowedHostLayer::&lt;_, String&gt;::default()
@@ -341,6 +360,9 @@
     F: Matcher,
 {
     <span class="doccomment">/// Add a host to allowed hosts layer
+    ///
+    /// # Example
+    ///
     /// ```rust
     /// let layer =
     ///     tower_allowed_hosts::AllowedHostLayer::&lt;_, String&gt;::default().push_host("example.com");
@@ -352,6 +374,9 @@
     </span>}
 
     <span class="doccomment">/// Extend allowed hosts layer with provided hosts
+    ///
+    /// # Example
+    ///
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::&lt;_, String&gt;::default()
     ///     .extend_hosts(vec!["example.com"]);
@@ -365,12 +390,18 @@
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Add a forwarded header token value to allowed hosts layer
+    <span class="doccomment">/// Add a token-value pair for matching in the `Forwarded` header.
+    ///
+    /// # Examples
+    ///
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
-    ///     .push_forwarded_token_value(["10", "random"]);
+    ///     .push_forwarded_token_value(("by", "random"));
     /// ```
+    ///
+    /// In above example only forwarded host name is extracted when host
+    /// forwarded header is present and by value matches to random as well
     </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>push_forwarded_token_value&lt;T, S&gt;(<span class="kw-2">mut </span><span class="self">self</span>, matcher: T) -&gt; <span class="self">Self
     </span><span class="kw">where
@@ -384,6 +415,9 @@
     </span>}
 
     <span class="doccomment">/// Extend allowed hosts layer with provided forwarded header token values
+    ///
+    /// # Example
+    ///
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
@@ -532,7 +566,7 @@
     <span class="prelude-val">Ok</span>(host_header)
 }
 
-<span class="doccomment">/// Extract host from Host headers.
+<span class="doccomment">/// Extract host from `Host` headers.
 </span><span class="kw">fn </span>extract_from_host(headers: <span class="kw-2">&amp;</span>HeaderMap) -&gt; <span class="prelude-ty">Result</span>&lt;String, Error&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>host_headers = headers.get_all(HOST).iter();
     <span class="kw">let </span>first_host = host_headers.next().ok_or(Error::MissingHostHeader)<span class="question-mark">?</span>;
@@ -546,7 +580,7 @@
     <span class="prelude-val">Ok</span>(host_str)
 }
 
-<span class="doccomment">/// Extract host from Forwarded headers only extract host header from allowed
+<span class="doccomment">/// Extract host from `Forwarded` headers only extract host header from allowed
 /// forwarded by values else return None
 </span><span class="kw">fn </span>extract_from_forwarded&lt;F&gt;(
     headers: <span class="kw-2">&amp;</span>HeaderMap,
