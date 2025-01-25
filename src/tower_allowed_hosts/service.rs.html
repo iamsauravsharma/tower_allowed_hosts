@@ -305,7 +305,27 @@
 <a href="#304" id="304">304</a>
 <a href="#305" id="305">305</a>
 <a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a></pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::convert::Into;
 <span class="kw">use </span>std::future::Future;
 <span class="kw">use </span>std::pin::Pin;
@@ -323,12 +343,29 @@
 
 <span class="kw">type </span>BoxError = Box&lt;<span class="kw">dyn </span>std::error::Error + Send + Sync&gt;;
 
-<span class="doccomment">/// Allowed hosts layer to validate and allow requests based on their host.
+<span class="doccomment">/// A layer that validates and allows incoming requests based on their host.
 ///
-/// The hostname is resolved through `Forwarded` header and `Host` header
+/// This layer checks the hostname of incoming requests against a list of
+/// allowed hosts. The hostname is resolved using the `Forwarded` header if
+/// `forwarded_token_value` is present and then `Host` header.
 ///
-/// If `forwarded_token_value` is specified than hostname are  extract from such
-/// forwarded value which matches forwarded token value
+/// If `forwarded_token_value` is specified, the layer will use the `Forwarded`
+/// header to extract the hostname when the specified token-value pair is
+/// present in the header. For example, if `forwarded_token_value` is set to
+/// `("signature", "random_value")`, the layer will parse the `Forwarded` header
+/// and extract the hostname only if the `signature` token matches the value
+/// `random_value`. If the token-value pair is not found, the layer will fall
+/// back to using the `Host` header.
+///
+///  # Example of `Forwarded` Header Parsing
+///
+/// Given the `Forwarded` header:
+/// ```text
+/// for=10.0.10.11;by=10.1.12.11;host=127.0.0.1;signature=random_value,
+/// for=10.0.10.11;by=10.1.12.11;host=127.0.0.3
+/// ```
+/// If `forwarded_token_value` is set to `("signature", "random_value")`, the
+/// layer will extract the host `127.0.0.1` and ignore the other host values.
 ///
 /// # Examples
 ///
@@ -339,14 +376,14 @@
 </span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>AllowedHostLayer&lt;H, F&gt; {
     hosts: Vec&lt;H&gt;,
-    forwarded_token_value: Vec&lt;(String, F)&gt;,
+    forwarded_token_values: Vec&lt;(String, F)&gt;,
 }
 
 <span class="kw">impl</span>&lt;H, F&gt; Default <span class="kw">for </span>AllowedHostLayer&lt;H, F&gt; {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             hosts: <span class="macro">vec!</span>[],
-            forwarded_token_value: <span class="macro">vec!</span>[],
+            forwarded_token_values: <span class="macro">vec!</span>[],
         }
     }
 }
@@ -406,8 +443,8 @@
         S: Into&lt;String&gt;,
     {
         <span class="kw">let </span>(token, val) = matcher.into();
-        <span class="self">self</span>.forwarded_token_value
-            .push((Into::&lt;String&gt;::into(token).to_ascii_lowercase(), val));
+        <span class="self">self</span>.forwarded_token_values
+            .push((Into::&lt;String&gt;::into(token).to_lowercase(), val));
         <span class="self">self
     </span>}
 
@@ -427,7 +464,7 @@
         T: Into&lt;(S, F)&gt;,
         S: Into&lt;String&gt;,
     {
-        <span class="self">self</span>.forwarded_token_value.extend(
+        <span class="self">self</span>.forwarded_token_values.extend(
             matchers
                 .into_iter()
                 .map(Into::into)
@@ -476,7 +513,7 @@
     }
 
     <span class="kw">fn </span>call(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>req: Request&lt;ReqBody&gt;) -&gt; <span class="self">Self</span>::Future {
-        <span class="kw">match </span>get_host(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer.forwarded_token_value) {
+        <span class="kw">match </span>get_host(req.headers(), <span class="kw-2">&amp;</span><span class="self">self</span>.layer.forwarded_token_values) {
             <span class="prelude-val">Ok</span>(host_val) =&gt; {
                 <span class="kw">let </span>host_allowed = <span class="self">self
                     </span>.layer
@@ -567,8 +604,7 @@
     <span class="kw">if </span>host_headers.next().is_some() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(Error::MultipleHostHeader);
     }
-    <span class="kw">let </span>host_str = first_host
-        .to_str()
+    <span class="kw">let </span>host_str = String::from_utf8(first_host.as_bytes().to_vec())
         .map_err(|<span class="kw">_</span>| Error::InvalidHostHeader)<span class="question-mark">?
         </span>.to_string();
     <span class="prelude-val">Ok</span>(host_str)
@@ -578,34 +614,38 @@
 /// forwarded by values else return None
 </span><span class="kw">fn </span>extract_from_forwarded&lt;F&gt;(
     headers: <span class="kw-2">&amp;</span>HeaderMap,
-    forwarded_token_value: <span class="kw-2">&amp;</span>[(String, F)],
+    forwarded_token_values: <span class="kw-2">&amp;</span>[(String, F)],
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;String&gt;, Error&gt;
 <span class="kw">where
     </span>F: Matcher,
 {
-    <span class="kw">if </span>!forwarded_token_value.is_empty() {
+    <span class="kw">if </span>!forwarded_token_values.is_empty() {
         <span class="kw">for </span>forwarded_header <span class="kw">in </span>headers.get_all(FORWARDED) {
-            <span class="kw">let </span>header_str = forwarded_header
-                .to_str()
+            <span class="kw">let </span>header_str = String::from_utf8(forwarded_header.as_bytes().to_vec())
                 .map_err(|<span class="kw">_</span>| Error::InvalidForwardedHeader)<span class="question-mark">?</span>;
             <span class="kw">for </span>header <span class="kw">in </span>header_str.split(<span class="string">','</span>) {
-                <span class="kw">let </span><span class="kw-2">mut </span>token_value_hash_map = HashMap::new();
+                <span class="kw">let </span><span class="kw-2">mut </span>forwarded_host_token = <span class="prelude-val">None</span>;
+                <span class="kw">let </span><span class="kw-2">mut </span>token_value_map = HashMap::new();
                 <span class="kw">for </span>part <span class="kw">in </span>header.split(<span class="string">';'</span>) {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>((key, value)) = part.split_once(<span class="string">'='</span>) {
-                        token_value_hash_map.insert(key.to_ascii_lowercase(), value.to_string());
+                        <span class="kw">let </span>key = key.to_lowercase();
+                        <span class="kw">let </span>value = value.to_string();
+
+                        <span class="kw">if </span>key == <span class="string">"host" </span>{
+                            forwarded_host_token = <span class="prelude-val">Some</span>(value);
+                        } <span class="kw">else </span>{
+                            token_value_map.insert(key, value);
+                        }
                     }
                 }
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(host_value) = token_value_hash_map.get(<span class="string">"host"</span>) {
-                    <span class="kw">if </span>forwarded_token_value
-                        .iter()
-                        .any(|(passed_token, passed_value)| {
-                            token_value_hash_map
-                                .get(passed_token)
-                                .is_some_and(|token_value| passed_value.matches_value(token_value))
-                        })
-                    {
-                        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(host_value.to_string()));
-                    }
+                <span class="kw">if </span>forwarded_host_token.is_some()
+                    &amp;&amp; forwarded_token_values.iter().any(|(token, matcher)| {
+                        token_value_map
+                            .get(token)
+                            .is_some_and(|token_value| matcher.matches_value(token_value))
+                    })
+                {
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(forwarded_host_token);
                 }
             }
         }
