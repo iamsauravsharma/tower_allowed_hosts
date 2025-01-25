@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":["Matcher"]};
+window.SIDEBAR_ITEMS = {"struct":["Asterisk"],"trait":["Matcher"]};
