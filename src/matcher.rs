@@ -13,9 +13,19 @@ use wildmatch::WildMatchPattern;
 /// allowing it to be implemented for a variety of pattern matching scenarios.
 /// Beyond simple string comparisons `Matcher` can be extended to support
 /// complex operations according to requirements
-pub trait Matcher {
+pub trait Matcher: Clone {
     /// Checks if provided value matches according to matcher
     fn matches_value(&self, value: &str) -> bool;
+}
+
+/// Asterisk matcher which always returns true and matches any host
+#[derive(Clone)]
+pub struct Asterisk;
+
+impl Matcher for Asterisk {
+    fn matches_value(&self, _value: &str) -> bool {
+        true
+    }
 }
 
 impl Matcher for String {

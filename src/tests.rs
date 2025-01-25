@@ -5,6 +5,7 @@ use http::{Request, Response};
 use http_body_util::BodyExt;
 use tower::{service_fn, BoxError, Layer, ServiceExt};
 
+use crate::matcher::Asterisk;
 use crate::AllowedHostLayer;
 
 type BoxBody = http_body_util::combinators::UnsyncBoxBody<Bytes, BoxError>;
@@ -39,17 +40,6 @@ async fn normal() {
         )
         .await;
     assert!(valid_host_header_res.is_ok());
-
-    let valid_from_cache = svc
-        .clone()
-        .oneshot(
-            Request::builder()
-                .header("HOST", "127.0.0.1")
-                .body(empty_body())
-                .unwrap(),
-        )
-        .await;
-    assert!(valid_from_cache.is_ok());
 
     let invalid_host_header_res = svc
         .clone()
@@ -208,4 +198,37 @@ async fn regex() {
         )
         .await;
     assert!(issue_no_3.is_err());
+}
+
+#[tokio::test]
+async fn asterisk() {
+    let allowed_host_layer = AllowedHostLayer::default()
+        .push_host(Asterisk)
+        .push_forwarded_token_value(("by", Asterisk));
+    let svc = allowed_host_layer.layer(service_fn(inner_svc));
+
+    let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
+    assert!(empty_res.is_err());
+
+    let valid_host_header_res = svc
+        .clone()
+        .oneshot(
+            Request::builder()
+                .header("HOST", "127.0.0.1")
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await;
+    assert!(valid_host_header_res.is_ok());
+
+    let any_value_host_header_res = svc
+        .clone()
+        .oneshot(
+            Request::builder()
+                .header("HOST", "any_value")
+                .body(empty_body())
+                .unwrap(),
+        )
+        .await;
+    assert!(any_value_host_header_res.is_ok());
 }

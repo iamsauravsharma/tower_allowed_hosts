@@ -91,7 +91,7 @@ where
     /// ```
     ///
     /// In above example only forwarded host name is extracted when host
-    /// forwarded header is present and by value matches to random as well
+    /// forwarded header is present and `by` value matches as `random` as well
     #[must_use]
     pub fn push_forwarded_token_value<T, S>(mut self, matcher: T) -> Self
     where
@@ -215,10 +215,9 @@ where
     type Output = Result<Response, BoxError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let host = self.host.clone();
         let this = self.project();
 
-        match (host, &this.host_allowed) {
+        match (&this.host, &this.host_allowed) {
             (Ok(allowed_host), true) => {
                 match this.response_future.poll(cx) {
                     Poll::Ready(result) => {
@@ -232,13 +231,11 @@ where
             (Ok(blocked_host), false) => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("blocked host: {}", blocked_host);
-                Poll::Ready(Err(Box::new(Error::HostNotAllowed(blocked_host)).into()))
+                Poll::Ready(Err(
+                    Box::new(Error::HostNotAllowed(blocked_host.clone())).into()
+                ))
             }
-            (Err(err), _) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("{}", err);
-                Poll::Ready(Err(Box::new(err).into()))
-            }
+            (Err(err), _) => Poll::Ready(Err(Box::new(err.clone()).into())),
         }
     }
 }
