@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["tower_allowed_hosts",[["impl UnsafeUnpin for <a class=\"enum\" href=\"tower_allowed_hosts/error/enum.Error.html\" title=\"enum tower_allowed_hosts::error::Error\">Error</a>",1,["tower_allowed_hosts::error::Error"]],["impl UnsafeUnpin for <a class=\"struct\" href=\"tower_allowed_hosts/matcher/struct.Asterisk.html\" title=\"struct tower_allowed_hosts::matcher::Asterisk\">Asterisk</a>",1,["tower_allowed_hosts::matcher::Asterisk"]],["impl UnsafeUnpin for <a class=\"struct\" href=\"tower_allowed_hosts/struct.Host.html\" title=\"struct tower_allowed_hosts::Host\">Host</a>",1,["tower_allowed_hosts::Host"]],["impl&lt;F&gt; UnsafeUnpin for <a class=\"struct\" href=\"tower_allowed_hosts/service/struct.AllowedHostFuture.html\" title=\"struct tower_allowed_hosts::service::AllowedHostFuture\">AllowedHostFuture</a>&lt;F&gt;<div class=\"where\">where\n    F: UnsafeUnpin,</div>",1,["tower_allowed_hosts::service::AllowedHostFuture"]],["impl&lt;H, F&gt; UnsafeUnpin for <a class=\"struct\" href=\"tower_allowed_hosts/struct.AllowedHostLayer.html\" title=\"struct tower_allowed_hosts::AllowedHostLayer\">AllowedHostLayer</a>&lt;H, F&gt;",1,["tower_allowed_hosts::service::AllowedHostLayer"]],["impl&lt;H, F, S&gt; UnsafeUnpin for <a class=\"struct\" href=\"tower_allowed_hosts/service/struct.AllowedHost.html\" title=\"struct tower_allowed_hosts::service::AllowedHost\">AllowedHost</a>&lt;H, F, S&gt;<div class=\"where\">where\n    S: UnsafeUnpin,</div>",1,["tower_allowed_hosts::service::AllowedHost"]]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[1502]}
