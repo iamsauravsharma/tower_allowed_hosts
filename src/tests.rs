@@ -3,10 +3,10 @@ use std::convert::Infallible;
 use bytes::Bytes;
 use http::{Request, Response};
 use http_body_util::BodyExt;
-use tower::{service_fn, BoxError, Layer, ServiceExt};
+use tower::{BoxError, Layer, ServiceExt, service_fn};
 
-use crate::matcher::Asterisk;
 use crate::AllowedHostLayer;
+use crate::matcher::Asterisk;
 
 type BoxBody = http_body_util::combinators::UnsyncBoxBody<Bytes, BoxError>;
 

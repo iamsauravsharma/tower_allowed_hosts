@@ -10,9 +10,9 @@ use http::{HeaderMap, Request};
 use tower_layer::Layer;
 use tower_service::Service;
 
+use crate::Host;
 use crate::error::Error;
 use crate::matcher::Matcher;
-use crate::Host;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
