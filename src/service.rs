@@ -105,7 +105,8 @@ where
     /// ```
     ///
     /// In above example only forwarded host name is extracted when host
-    /// forwarded header is present and `by` value matches as `random` as well
+    /// forwarded header is present and case insensitive `by` value matches as
+    /// `random` as well
     #[must_use]
     pub fn push_forwarded_token_value<T, S>(mut self, matcher: T) -> Self
     where
@@ -125,7 +126,7 @@ where
     /// ```rust
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
-    ///     .extend_forwarded_token_values([["signature", "random"]]);
+    ///     .extend_forwarded_token_values([("signature", "random")]);
     /// ```
     #[must_use]
     pub fn extend_forwarded_token_values<I, T, S>(mut self, matchers: I) -> Self
@@ -134,12 +135,9 @@ where
         T: Into<(S, F)>,
         S: Into<String>,
     {
-        self.forwarded_token_values.extend(
-            matchers
-                .into_iter()
-                .map(Into::into)
-                .map(|(t, v)| (Into::<String>::into(t).to_ascii_lowercase(), v)),
-        );
+        for matcher in matchers {
+            self = self.push_forwarded_token_value(matcher);
+        }
         self
     }
 }
