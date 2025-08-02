@@ -46,18 +46,16 @@ async fn normal() {
         .oneshot(
             Request::builder()
                 .header("HOST", "127.0.0.2")
-                .header("FORWARDED", "host=127.0.0.11")
                 .body(empty_body())
                 .unwrap(),
         )
         .await;
     assert!(invalid_host_header_res.is_err());
 
-    let valid_host_header_res = svc
+    let valid_forwarded_header_res = svc
         .clone()
         .oneshot(
             Request::builder()
-                .header("HOST", "127.0.0.1")
                 .header("FORWARDED", "host=example.com")
                 .header(
                     "FORWARDED",
@@ -68,9 +66,9 @@ async fn normal() {
                 .unwrap(),
         )
         .await;
-    assert!(valid_host_header_res.is_ok());
+    assert!(valid_forwarded_header_res.is_ok());
 
-    let invalid_host_header_res = svc
+    let invalid_forwarded_header_res = svc
         .clone()
         .oneshot(
             Request::builder()
@@ -80,14 +78,14 @@ async fn normal() {
                 )
                 .header(
                     "FORWARDED",
-                    "for=10.0.10.11;by=10.1.12.11;host=127.0.0.3,for=10.0.10.11;by=10.1.12.11;\
+                    "for=10.0.10.11;by=10.1.12.11;host=127.0.0.1,for=10.0.10.11;by=10.1.12.11;\
                      host=example.com",
                 )
                 .body(empty_body())
                 .unwrap(),
         )
         .await;
-    assert!(invalid_host_header_res.is_err());
+    assert!(invalid_forwarded_header_res.is_err());
 }
 
 #[cfg(feature = "wildcard")]

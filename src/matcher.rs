@@ -40,6 +40,12 @@ impl Matcher for &str {
     }
 }
 
+impl Matcher for () {
+    fn matches_value(&self, _value: &str) -> bool {
+        false
+    }
+}
+
 #[cfg(feature = "wildcard")]
 impl<const MULTI_WILDCARD: char, const SINGLE_WILDCARD: char> Matcher
     for WildMatchPattern<MULTI_WILDCARD, SINGLE_WILDCARD>
@@ -53,6 +59,19 @@ impl<const MULTI_WILDCARD: char, const SINGLE_WILDCARD: char> Matcher
 impl Matcher for Regex {
     fn matches_value(&self, value: &str) -> bool {
         self.is_match(value)
+    }
+}
+
+impl<M> Matcher for Option<M>
+where
+    M: Matcher,
+{
+    fn matches_value(&self, value: &str) -> bool {
+        if let Some(matcher) = self {
+            matcher.matches_value(value)
+        } else {
+            false
+        }
     }
 }
 
@@ -80,5 +99,22 @@ where
 {
     fn matches_value(&self, value: &str) -> bool {
         self.iter().all(|matcher| matcher.matches_value(value))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::matcher::{Asterisk, Matcher as _};
+
+    #[test]
+    fn matcher() {
+        assert!("abc".matches_value("abc"));
+        assert!(!None::<String>.matches_value("abc"));
+        assert!(Some("xyz").matches_value("xyz"));
+        assert!(!().matches_value("def"));
+        assert!(!vec!["abc", "def"].matches_value("abc"));
+        assert!(!"Nepal".matches_value("nepal"));
+        assert!(!"ABC".matches_value("abc"));
+        assert!(Asterisk.matches_value("random_val"));
     }
 }
