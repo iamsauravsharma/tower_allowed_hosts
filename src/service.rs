@@ -1,8 +1,5 @@
 use std::collections::HashMap;
-use std::convert::Into;
-use std::future::Future;
 use std::pin::Pin;
-use std::string::ToString;
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
@@ -215,7 +212,7 @@ where
     }
 }
 
-/// Future for AllowedHost service.
+/// Future for `AllowedHost` service.
 #[pin_project::pin_project]
 pub struct AllowedHostFuture<F> {
     #[pin]

@@ -2,8 +2,8 @@ use std::convert::Infallible;
 
 use bytes::Bytes;
 use http::{Request, Response};
-use http_body_util::BodyExt;
-use tower::{BoxError, Layer, ServiceExt, service_fn};
+use http_body_util::BodyExt as _;
+use tower::{BoxError, Layer as _, ServiceExt as _, service_fn};
 
 use crate::AllowedHostLayer;
 use crate::matcher::Asterisk;
