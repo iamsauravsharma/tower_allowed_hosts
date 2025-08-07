@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use http::header::{FORWARDED, HOST};
-use http::{HeaderMap, Request};
+use http::{HeaderMap, Request, Version};
 use tower_layer::Layer;
 use tower_service::Service;
 
@@ -17,7 +17,9 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 ///
 /// This layer checks the hostname of incoming requests against a list of
 /// allowed hosts. The hostname is resolved using the `Forwarded` header if
-/// `forwarded_token_value` is present and then `Host` header.
+/// `forwarded_token_value` is present and then `Host` header. For HTTP version
+/// 2 and 3 along with `HOST` header `:authority` pseudo-header is also used to
+/// resolve host of server
 ///
 /// If `forwarded_token_value` is specified, the layer will use the `Forwarded`
 /// header to extract the hostname when the specified token-value pair is
@@ -181,7 +183,7 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
-        match get_host(req.headers(), &self.layer.forwarded_token_values) {
+        match get_host(&req, &self.layer.forwarded_token_values) {
             Ok(host_val) => {
                 let host_allowed = self
                     .layer
@@ -254,13 +256,31 @@ where
 
 /// Extract the host from the request headers based on the layer
 /// configuration.
-fn get_host<F>(headers: &HeaderMap, forwarded_token_value: &[(String, F)]) -> Result<String, Error>
+fn get_host<F, ReqBody>(
+    req: &Request<ReqBody>,
+    forwarded_token_value: &[(String, F)],
+) -> Result<String, Error>
 where
     F: Matcher,
 {
+    let headers = req.headers();
     let host_header = match extract_from_forwarded(headers, forwarded_token_value)? {
-        Some(host) => host,
-        None => extract_from_host(headers)?,
+        Some(forwarded_host) => forwarded_host,
+        None => {
+            match extract_from_host(headers) {
+                Ok(host) => host,
+                Err(err) => {
+                    if [Version::HTTP_2, Version::HTTP_3].contains(&req.version()) {
+                        req.uri()
+                            .authority()
+                            .map(ToString::to_string)
+                            .ok_or(Error::MissingAuthority)?
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        }
     };
     Ok(host_header)
 }

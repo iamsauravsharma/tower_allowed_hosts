@@ -17,4 +17,7 @@ pub enum Error {
     /// error when there is multiple host header
     #[error("multiple host header")]
     MultipleHostHeader,
+    /// error when uri is missing along with host header
+    #[error("missing :authority pseudo header")]
+    MissingAuthority,
 }
