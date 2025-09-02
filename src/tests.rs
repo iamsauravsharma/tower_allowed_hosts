@@ -92,7 +92,7 @@ async fn normal() {
 #[tokio::test]
 async fn wildcard() {
     let allowed_host_layer =
-        AllowedHostLayer::<_, String>::default().push_host(wildmatch::WildMatch::new("127.0.0.?"));
+        AllowedHostLayer::<_, ()>::default().push_host(wildmatch::WildMatch::new("127.0.0.?"));
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -135,7 +135,7 @@ async fn wildcard() {
 #[cfg(feature = "regex")]
 #[tokio::test]
 async fn regex() {
-    let allowed_host_layer = AllowedHostLayer::<_, String>::default()
+    let allowed_host_layer = AllowedHostLayer::<_, ()>::default()
         .push_host(regex::Regex::new("^[a-z]+.example.com$").unwrap());
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 

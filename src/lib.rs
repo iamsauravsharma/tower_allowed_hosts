@@ -4,8 +4,8 @@
 //!
 //! # Examples
 //! ```rust
-//! let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
-//!     .extend_hosts(vec!["example.com"]);
+//! let layer =
+//!     tower_allowed_hosts::AllowedHostLayer::<_, ()>::default().extend_hosts(vec!["example.com"]);
 //! ```
 //!
 //! Check `README.MD` or documentation of [`AllowedHostLayer`] for more detailed

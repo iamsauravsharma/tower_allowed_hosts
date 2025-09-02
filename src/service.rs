@@ -42,8 +42,8 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// # Examples
 ///
 /// ```rust
-/// let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
-///     .extend_hosts(vec!["example.com"]);
+/// let layer =
+///     tower_allowed_hosts::AllowedHostLayer::<_, ()>::default().extend_hosts(vec!["example.com"]);
 /// ```
 #[derive(Clone)]
 pub struct AllowedHostLayer<H, F> {
@@ -65,13 +65,14 @@ where
     H: Matcher,
     F: Matcher,
 {
-    /// Add a host to allowed hosts layer
+    /// Add a host to allowed hosts layer.
     ///
     /// # Example
     ///
     /// ```rust
-    /// let layer =
-    ///     tower_allowed_hosts::AllowedHostLayer::<_, String>::default().push_host("example.com");
+    /// let layer = tower_allowed_hosts::AllowedHostLayer::<_, ()>::default()
+    ///     .push_host("example.com")
+    ///     .push_host("example2.com");
     /// ```
     #[must_use]
     pub fn push_host(mut self, matcher: H) -> Self {
@@ -98,17 +99,20 @@ where
 
     /// Add a token-value pair for matching in the `Forwarded` header.
     ///
+    /// Each matcher pushed would be `OR`ed to check if value is valid or not.
+    /// If you need to do `And`ed operation than you need to pass a vector of
+    /// matcher to push host
+    ///
     /// # Examples
     ///
     /// ```rust
+    /// // Only extract host when `by` value is `random` or `to` value is `me from `Forwarded`
+    /// // header
     /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
     ///     .push_host("example.com")
-    ///     .push_forwarded_token_value(("by", "random"));
+    ///     .push_forwarded_token_value(("by", "random"))
+    ///     .push_forwarded_token_value(("to", "me"));
     /// ```
-    ///
-    /// In above example only forwarded host name is extracted when host
-    /// forwarded header is present and case insensitive `by` value matches as
-    /// `random` as well
     #[must_use]
     pub fn push_forwarded_token_value<T, S>(mut self, matcher: T) -> Self
     where
@@ -292,9 +296,8 @@ fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
     if host_headers.next().is_some() {
         return Err(Error::MultipleHostHeader);
     }
-    let host_str = String::from_utf8(first_host.as_bytes().to_vec())
-        .map_err(|_| Error::InvalidHostHeader)?
-        .to_string();
+    let host_str =
+        String::from_utf8(first_host.as_bytes().to_vec()).map_err(|_| Error::InvalidHostHeader)?;
     Ok(host_str)
 }
 
@@ -311,32 +314,55 @@ where
         for forwarded_header in headers.get_all(FORWARDED) {
             let header_str = String::from_utf8(forwarded_header.as_bytes().to_vec())
                 .map_err(|_| Error::InvalidForwardedHeader)?;
-            for header in header_str.split(',') {
-                let mut forwarded_host_token = None;
-                let mut token_value_map = HashMap::new();
-                for part in header.split(';') {
-                    if let Some((key, value)) = part.split_once('=') {
-                        let key = key.to_lowercase();
-                        let value = value.to_string();
+            for header_entry in header_str.split(',') {
+                let (host_value, token_present) = parse_forwarded_entry(header_entry)?;
 
-                        if key == "host" {
-                            forwarded_host_token = Some(value);
-                        } else {
-                            token_value_map.insert(key, value);
-                        }
-                    }
-                }
-                if forwarded_host_token.is_some()
-                    && forwarded_token_values.iter().any(|(token, matcher)| {
-                        token_value_map
-                            .get(token)
-                            .is_some_and(|token_value| matcher.matches_value(token_value))
-                    })
+                if let Some(host) = host_value
+                    && is_token_valid(&token_present, forwarded_token_values)
                 {
-                    return Ok(forwarded_host_token);
+                    return Ok(Some(host));
                 }
             }
         }
     }
     Ok(None)
+}
+
+/// Parse a single Forwarded header entry and extract host + token presence
+fn parse_forwarded_entry(entry: &str) -> Result<(Option<String>, HashMap<String, String>), Error> {
+    let mut host_value = None;
+    let mut token_map = HashMap::new();
+
+    for part in entry.split(';') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+
+        let (key, value) = part.split_once('=').ok_or(Error::InvalidForwardedHeader)?;
+
+        let key = key.trim().to_lowercase();
+        let value = value.trim().trim_matches('"').to_string();
+
+        match key.as_str() {
+            "host" => host_value = Some(value),
+            _ => {
+                token_map.insert(key, value);
+            }
+        }
+    }
+
+    Ok((host_value, token_map))
+}
+
+/// Check if any of the allowed token values are present and valid
+fn is_token_valid<F>(token_map: &HashMap<String, String>, allowed_tokens: &[(String, F)]) -> bool
+where
+    F: Matcher,
+{
+    allowed_tokens.iter().any(|(token_name, matcher)| {
+        token_map
+            .get(token_name)
+            .is_some_and(|token_value| matcher.matches_value(token_value))
+    })
 }
