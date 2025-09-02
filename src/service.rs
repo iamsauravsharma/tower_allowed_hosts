@@ -9,21 +9,21 @@ use tower_service::Service;
 
 use crate::Host;
 use crate::error::Error;
-use crate::matcher::Matcher;
+use crate::matcher::{KeyValueMatcher, Matcher};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// A layer that validates and allows incoming requests based on their host.
 ///
-/// This layer checks the hostname of incoming requests against a list of
-/// allowed hosts. The hostname is resolved using the `Forwarded` header if
-/// `forwarded_token_value` is present and then `Host` header. For HTTP version
-/// 2 and 3 along with `HOST` header `:authority` pseudo-header is also used to
-/// resolve host of server
+/// This layer checks the hostname of incoming requests against allowed hosts.
+/// The hostname is resolved using the `Forwarded` header if `forwarded_matcher`
+/// is present and then `Host` header. For HTTP version 2 and 3 along with
+/// `HOST` header `:authority` pseudo-header is also used to resolve host of
+/// server
 ///
-/// If `forwarded_token_value` is specified, the layer will use the `Forwarded`
+/// If `forwarded_matcher` is specified, the layer will use the `Forwarded`
 /// header to extract the hostname when the specified token-value pair is
-/// present in the header. For example, if `forwarded_token_value` is set to
+/// present in the header. For example, if `forwarded_matcher` is set to
 /// `("signature", "random_value")`, the layer will parse the `Forwarded` header
 /// and extract the hostname only if the `signature` token matches the value
 /// `random_value`. If the token-value pair is not found, the layer will fall
@@ -36,115 +36,52 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// for=10.0.10.11;by=10.1.12.11;host=127.0.0.1;signature=random_value,
 /// for=10.0.10.11;by=10.1.12.11;host=127.0.0.3
 /// ```
-/// If `forwarded_token_value` is set to `("signature", "random_value")`, the
+/// If `forwarded_matcher` is set to `("signature", "random_value")`, the
 /// layer will extract the host `127.0.0.1` and ignore the other host values.
 ///
 /// # Examples
 ///
 /// ```rust
-/// let layer =
-///     tower_allowed_hosts::AllowedHostLayer::<_, ()>::default().extend_hosts(vec!["example.com"]);
+/// let layer = tower_allowed_hosts::AllowedHostLayer::new("example.com");
 /// ```
 #[derive(Clone)]
 pub struct AllowedHostLayer<H, F> {
-    hosts: Vec<H>,
-    forwarded_token_values: Vec<(String, F)>,
+    host_matcher: H,
+    forwarded_matcher: F,
 }
 
-impl<H, F> Default for AllowedHostLayer<H, F> {
-    fn default() -> Self {
+impl<H> AllowedHostLayer<H, ()> {
+    /// Create new allowed host layer with provided host matcher
+    ///
+    /// # Example
+    /// ```
+    /// let layer = tower_allowed_hosts::AllowedHostLayer::new("example.com");
+    /// ```
+    pub fn new(host_matcher: H) -> Self {
         Self {
-            hosts: vec![],
-            forwarded_token_values: vec![],
+            host_matcher,
+            forwarded_matcher: (),
         }
     }
 }
 
-impl<H, F> AllowedHostLayer<H, F>
-where
-    H: Matcher,
-    F: Matcher,
-{
-    /// Add a host to allowed hosts layer.
+impl<H> AllowedHostLayer<H, ()> {
+    /// Extend a host matcher with provided forwarded matcher
+    ///
     ///
     /// # Example
-    ///
-    /// ```rust
-    /// let layer = tower_allowed_hosts::AllowedHostLayer::<_, ()>::default()
-    ///     .push_host("example.com")
-    ///     .push_host("example2.com");
     /// ```
-    #[must_use]
-    pub fn push_host(mut self, matcher: H) -> Self {
-        self.hosts.push(matcher);
-        self
-    }
-
-    /// Extend allowed hosts layer with provided hosts
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let layer = tower_allowed_hosts::AllowedHostLayer::<_, String>::default()
-    ///     .extend_hosts(vec!["example.com"]);
+    /// let layer = tower_allowed_hosts::AllowedHostLayer::new("example.com")
+    ///     .with_forwarded_matcher(("by", "example.org"));
     /// ```
-    #[must_use]
-    pub fn extend_hosts<I>(mut self, matchers: I) -> Self
+    pub fn with_forwarded_matcher<F>(self, forwarded_matcher: F) -> AllowedHostLayer<H, F>
     where
-        I: IntoIterator<Item = H>,
+        F: KeyValueMatcher,
     {
-        self.hosts.extend(matchers);
-        self
-    }
-
-    /// Add a token-value pair for matching in the `Forwarded` header.
-    ///
-    /// Each matcher pushed would be `OR`ed to check if value is valid or not.
-    /// If you need to do `And`ed operation than you need to pass a vector of
-    /// matcher to push host
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// // Only extract host when `by` value is `random` or `to` value is `me from `Forwarded`
-    /// // header
-    /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
-    ///     .push_host("example.com")
-    ///     .push_forwarded_token_value(("by", "random"))
-    ///     .push_forwarded_token_value(("to", "me"));
-    /// ```
-    #[must_use]
-    pub fn push_forwarded_token_value<T, S>(mut self, matcher: T) -> Self
-    where
-        T: Into<(S, F)>,
-        S: Into<String>,
-    {
-        let (token, val) = matcher.into();
-        self.forwarded_token_values
-            .push((Into::<String>::into(token).to_lowercase(), val));
-        self
-    }
-
-    /// Extend allowed hosts layer with provided forwarded header token values
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let layer = tower_allowed_hosts::AllowedHostLayer::default()
-    ///     .push_host("example.com")
-    ///     .extend_forwarded_token_values([("signature", "random")]);
-    /// ```
-    #[must_use]
-    pub fn extend_forwarded_token_values<I, T, S>(mut self, matchers: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<(S, F)>,
-        S: Into<String>,
-    {
-        for matcher in matchers {
-            self = self.push_forwarded_token_value(matcher);
+        AllowedHostLayer {
+            host_matcher: self.host_matcher,
+            forwarded_matcher,
         }
-        self
     }
 }
 
@@ -176,7 +113,7 @@ where
     S: Service<Request<ReqBody>>,
     S::Error: Into<BoxError>,
     H: Matcher,
-    F: Matcher,
+    F: KeyValueMatcher,
 {
     type Error = BoxError;
     type Future = AllowedHostFuture<S::Future>;
@@ -187,13 +124,9 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
-        match get_host(&req, &self.layer.forwarded_token_values) {
+        match get_host(&req, &self.layer.forwarded_matcher) {
             Ok(host_val) => {
-                let host_allowed = self
-                    .layer
-                    .hosts
-                    .iter()
-                    .any(|host_matcher| host_matcher.matches_value(host_val.as_str()));
+                let host_allowed = self.layer.host_matcher.matches_value(host_val.as_str());
 
                 if host_allowed {
                     req.extensions_mut().insert(Host(host_val.clone()));
@@ -260,15 +193,12 @@ where
 
 /// Extract the host from the request headers based on the layer
 /// configuration.
-fn get_host<F, ReqBody>(
-    req: &Request<ReqBody>,
-    forwarded_token_value: &[(String, F)],
-) -> Result<String, Error>
+fn get_host<F, ReqBody>(req: &Request<ReqBody>, forwarded_matcher: &F) -> Result<String, Error>
 where
-    F: Matcher,
+    F: KeyValueMatcher,
 {
     let headers = req.headers();
-    let host_header = match extract_from_forwarded(headers, forwarded_token_value)? {
+    let host_header = match extract_from_forwarded(headers, forwarded_matcher)? {
         Some(forwarded_host) => forwarded_host,
         None => {
             match extract_from_host(headers) {
@@ -296,8 +226,12 @@ fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
     if host_headers.next().is_some() {
         return Err(Error::MultipleHostHeader);
     }
-    let host_str =
-        String::from_utf8(first_host.as_bytes().to_vec()).map_err(|_| Error::InvalidHostHeader)?;
+    let host_str = first_host
+        .to_str()
+        .map_err(|_| Error::InvalidHostHeader)?
+        .trim()
+        .trim_matches('"')
+        .to_string();
     Ok(host_str)
 }
 
@@ -305,23 +239,21 @@ fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
 /// forwarded by values else return None
 fn extract_from_forwarded<F>(
     headers: &HeaderMap,
-    forwarded_token_values: &[(String, F)],
+    forwarded_matcher: &F,
 ) -> Result<Option<String>, Error>
 where
-    F: Matcher,
+    F: KeyValueMatcher,
 {
-    if !forwarded_token_values.is_empty() {
-        for forwarded_header in headers.get_all(FORWARDED) {
-            let header_str = String::from_utf8(forwarded_header.as_bytes().to_vec())
-                .map_err(|_| Error::InvalidForwardedHeader)?;
-            for header_entry in header_str.split(',') {
-                let (host_value, token_present) = parse_forwarded_entry(header_entry)?;
+    for forwarded_header in headers.get_all(FORWARDED) {
+        let header_str = String::from_utf8(forwarded_header.as_bytes().to_vec())
+            .map_err(|_| Error::InvalidForwardedHeader)?;
+        for header_entry in header_str.split(',') {
+            let (host_value, token_present) = parse_forwarded_entry(header_entry)?;
 
-                if let Some(host) = host_value
-                    && is_token_valid(&token_present, forwarded_token_values)
-                {
-                    return Ok(Some(host));
-                }
+            if let Some(host) = host_value
+                && forwarded_matcher.matches_key_value(&token_present)
+            {
+                return Ok(Some(host));
             }
         }
     }
@@ -344,25 +276,11 @@ fn parse_forwarded_entry(entry: &str) -> Result<(Option<String>, HashMap<String,
         let key = key.trim().to_lowercase();
         let value = value.trim().trim_matches('"').to_string();
 
-        match key.as_str() {
-            "host" => host_value = Some(value),
-            _ => {
-                token_map.insert(key, value);
-            }
+        if key.as_str() == "host" {
+            host_value = Some(value.clone());
         }
+        token_map.insert(key, value);
     }
 
     Ok((host_value, token_map))
-}
-
-/// Check if any of the allowed token values are present and valid
-fn is_token_valid<F>(token_map: &HashMap<String, String>, allowed_tokens: &[(String, F)]) -> bool
-where
-    F: Matcher,
-{
-    allowed_tokens.iter().any(|(token_name, matcher)| {
-        token_map
-            .get(token_name)
-            .is_some_and(|token_value| matcher.matches_value(token_value))
-    })
 }
