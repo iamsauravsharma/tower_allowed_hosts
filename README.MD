@@ -24,8 +24,7 @@ tower_allowed_hosts = "0.9.2"
 To restrict access to specific basic hosts, you can use the following code:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
-    .extend_hosts(&["127.0.0.1".to_string()]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::new("127.0.0.1");
 ```
 
 ### Wildcard
@@ -40,8 +39,7 @@ tower_allowed_hosts = { version = "0.9.2", features = ["wildcard"] }
 You can then restrict hosts using wildcards:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::default()
-    .extend_hosts(&[wildmatch::WildMatch::new("127.0.0.*")]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(wildmatch::WildMatch::new("127.0.0.*"));
 ```
 
 ### Regex
@@ -56,7 +54,15 @@ tower_allowed_hosts = { version = "0.9.2", features = ["regex"] }
 You can then restrict hosts using regex patterns:
 
 ```rust
-let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(&[regex::Regex::new("^127.0.0.1$")?]);
+let tower_layer = tower_allowed_hosts::AllowedHostLayer::new(regex::Regex::new("^127.0.0.1$")?);
+```
+
+### Forwarded header
+If you wish to also handle `Forwarded` header than you can extend created `AllowedHostLayer` with `with_forwarded_matcher`
+
+```rust
+let layer = tower_allowed_hosts::AllowedHostLayer::new("example.com")
+    .with_forwarded_matcher(("by", "example.org"));
 ```
 
 # Integrating with a Tower-Compatible Library
@@ -75,8 +81,7 @@ use tower_allowed_hosts::AllowedHostLayer;
 fn router() -> Router {
     let handle_error_layer = HandleErrorLayer::new(handle_box_error);
 
-    let allowed_hosts_layer = AllowedHostLayer::default()
-        .extend_hosts(&[wildmatch::WildMatch::new("127.0.0.*")]);
+    let allowed_hosts_layer = AllowedHostLayer::new(wildmatch::WildMatch::new("127.0.0.*"));
 
      let layer = ServiceBuilder::new()
         .layer(handle_error_layer)

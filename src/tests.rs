@@ -6,7 +6,7 @@ use http_body_util::BodyExt as _;
 use tower::{BoxError, Layer as _, ServiceExt as _, service_fn};
 
 use crate::AllowedHostLayer;
-use crate::matcher::Asterisk;
+use crate::matcher::Any;
 
 type BoxBody = http_body_util::combinators::UnsyncBoxBody<Bytes, BoxError>;
 
@@ -22,9 +22,8 @@ async fn inner_svc(_: Request<BoxBody>) -> Result<Response<BoxBody>, Infallible>
 
 #[tokio::test]
 async fn normal() {
-    let allowed_host_layer = AllowedHostLayer::default()
-        .extend_hosts(["127.0.0.1".to_string()])
-        .extend_forwarded_token_values([("signature", "random_value")]);
+    let allowed_host_layer = AllowedHostLayer::new("127.0.0.1".to_string())
+        .with_forwarded_matcher(("signature", "random_value"));
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -91,8 +90,7 @@ async fn normal() {
 #[cfg(feature = "wildcard")]
 #[tokio::test]
 async fn wildcard() {
-    let allowed_host_layer =
-        AllowedHostLayer::<_, ()>::default().push_host(wildmatch::WildMatch::new("127.0.0.?"));
+    let allowed_host_layer = AllowedHostLayer::new(wildmatch::WildMatch::new("127.0.0.?"));
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -135,8 +133,8 @@ async fn wildcard() {
 #[cfg(feature = "regex")]
 #[tokio::test]
 async fn regex() {
-    let allowed_host_layer = AllowedHostLayer::<_, ()>::default()
-        .push_host(regex::Regex::new("^[a-z]+.example.com$").unwrap());
+    let allowed_host_layer =
+        AllowedHostLayer::new(regex::Regex::new("^[a-z]+.example.com$").unwrap());
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
@@ -199,10 +197,8 @@ async fn regex() {
 }
 
 #[tokio::test]
-async fn asterisk() {
-    let allowed_host_layer = AllowedHostLayer::default()
-        .push_host(Asterisk)
-        .push_forwarded_token_value(("by", Asterisk));
+async fn any() {
+    let allowed_host_layer = AllowedHostLayer::new(Any).with_forwarded_matcher(("by", Any));
     let svc = allowed_host_layer.layer(service_fn(inner_svc));
 
     let empty_res = svc.clone().oneshot(Request::new(empty_body())).await;
