@@ -182,9 +182,7 @@ where
             (Ok(blocked_host), false) => {
                 #[cfg(feature = "tracing")]
                 tracing::debug!("blocked host: {}", blocked_host);
-                Poll::Ready(Err(
-                    Box::new(Error::HostNotAllowed(blocked_host.clone())).into()
-                ))
+                Poll::Ready(Err(Error::HostNotAllowed(blocked_host.clone()).into()))
             }
             (Err(err), _) => Poll::Ready(Err(Box::new(err.clone()).into())),
         }
