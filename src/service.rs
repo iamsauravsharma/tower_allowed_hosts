@@ -15,35 +15,62 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 /// A layer that validates and allows incoming requests based on their host.
 ///
-/// This layer checks the hostname of incoming requests against allowed hosts.
-/// The hostname is resolved using the `Forwarded` header if `forwarded_matcher`
-/// is present and then `Host` header. For HTTP version 2 and 3 along with
-/// `HOST` header `:authority` pseudo-header is also used to resolve host of
-/// server
+/// This layer inspects the request authority/host and compares it against
+/// the configured list of allowed hosts. The authority is determined
+/// according to HTTP specifications, with optional support for trusted
+/// `Forwarded` headers.
 ///
-/// If `forwarded_matcher` is specified, the layer will use the `Forwarded`
-/// header to extract the hostname when the specified token-value pair is
-/// present in the header. For example, if `forwarded_matcher` is set to
-/// `("signature", "random_value")`, the layer will parse the `Forwarded` header
-/// and extract the hostname only if the `signature` token matches the value
-/// `random_value`. If the token-value pair is not found, the layer will fall
-/// back to using the `Host` header.
+/// ## Host resolution priority
 ///
-///  # Example of `Forwarded` Header Parsing
+/// 1. If `forwarded_matcher` is configured and matches, the `host` parameter
+///    from the `Forwarded` header is used as the effective host.   This applies
+///    to **all HTTP versions**.
+/// 2. Otherwise, host resolution falls back to protocol-specific rules:
+///    - For **HTTP/2 and HTTP/3**:
+///      - The `:authority` pseudo-header (via `req.uri().authority()`) is the
+///        canonical source.
+///      - If a `Host` header is present, it must match `:authority` or the
+///        request will be rejected.
+///      - If `:authority` is missing, the request is rejected.
+///    - For **HTTP/1.x and older**:
+///      - The `Host` header is used.
+///      - If the `Host` header is missing, the request is rejected (invalid per
+///        RFC 9112 §3.2).
 ///
-/// Given the `Forwarded` header:
+/// ## Forwarded header usage
+///
+/// When `forwarded_matcher` is set, the layer attempts to extract the `host`
+/// parameter from the `Forwarded` header only if the specified token-value
+/// pair is present in that header. This allows the layer to recover the
+/// client-facing host even if one or more proxies have rewritten the `Host`
+/// header or `:authority`.
+///
+/// For example:
+///
 /// ```text
-/// for=10.0.10.11;by=10.1.12.11;host=127.0.0.1;signature=random_value,
-/// for=10.0.10.11;by=10.1.12.11;host=127.0.0.3
+/// Forwarded: for=10.0.10.11;by=10.1.12.11;host=127.0.0.1;signature=random_value,
+///            for=10.0.10.11;by=10.1.12.11;host=127.0.0.3
 /// ```
-/// If `forwarded_matcher` is set to `("signature", "random_value")`, the
-/// layer will extract the host `127.0.0.1` and ignore the other host values.
 ///
-/// # Examples
+/// With `forwarded_matcher = ("signature", "random_value")`, the extracted
+/// host will be `127.0.0.1`. Other entries are ignored.
+///
+/// ## ⚠️ Security warning
+///
+/// The `Forwarded` header can be spoofed by clients unless it is **sanitized
+/// or injected by a trusted proxy**. Only enable `forwarded_matcher` if:
+/// - You fully control the proxies in front of this service, and
+/// - You trust them to strip any untrusted `Forwarded` headers.
+///
+/// In all other cases, rely solely on `:authority` (HTTP/2/3) or `Host`
+/// (HTTP/1.1) for determining the request authority.
+///
+/// ## Examples
 ///
 /// ```rust
 /// let layer = tower_allowed_hosts::AllowedHostLayer::new("example.com");
 /// ```
+
 #[derive(Clone)]
 pub struct AllowedHostLayer<H, F> {
     host_matcher: H,
@@ -184,49 +211,58 @@ where
                 tracing::debug!("blocked host: {}", blocked_host);
                 Poll::Ready(Err(Error::HostNotAllowed(blocked_host.clone()).into()))
             }
-            (Err(err), _) => Poll::Ready(Err(Box::new(err.clone()).into())),
+            (Err(err), _) => Poll::Ready(Err(err.clone().into())),
         }
     }
 }
 
-/// Extract the host from the request headers based on the layer
-/// configuration.
+/// Extract the host from the request headers based on the layer configuration.
 fn get_host<F, ReqBody>(req: &Request<ReqBody>, forwarded_matcher: &F) -> Result<String, Error>
 where
     F: KeyValueMatcher,
 {
     let headers = req.headers();
-    let host_header = match extract_from_forwarded(headers, forwarded_matcher)? {
-        Some(forwarded_host) => forwarded_host,
-        None => {
-            match extract_from_host(headers) {
-                Ok(host) => host,
-                Err(err) => {
-                    if [Version::HTTP_2, Version::HTTP_3].contains(&req.version()) {
-                        req.uri()
-                            .authority()
-                            .map(ToString::to_string)
-                            .ok_or(Error::MissingAuthority)?
-                    } else {
-                        return Err(err);
-                    }
+
+    if let Some(forwarded_host) = extract_from_forwarded(headers, forwarded_matcher)? {
+        return Ok(forwarded_host);
+    }
+
+    match req.version() {
+        // HTTP/2 and HTTP/3 use the :authority pseudo-header
+        Version::HTTP_2 | Version::HTTP_3 => {
+            if let Some(authority) = req.uri().authority() {
+                // :authority must be used, Host (if present) must match.
+                if let Ok(host) = extract_from_host(headers)
+                    && host != authority.as_str()
+                {
+                    return Err(Error::MismatchAuthorityHost);
                 }
+                return Ok(authority.to_string());
             }
+            Err(Error::MissingAuthority)
         }
-    };
-    Ok(host_header)
+        // HTTP/1.1 and earlier: must use the Host header
+        Version::HTTP_11 | Version::HTTP_10 | Version::HTTP_09 => {
+            if let Ok(host) = extract_from_host(headers) {
+                return Ok(host);
+            }
+            Err(Error::MissingHost)
+        }
+        // Future-proof fallback
+        _ => Err(Error::UnsupportedHttpVersion),
+    }
 }
 
 /// Extract host from `Host` headers.
 fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
     let mut host_headers = headers.get_all(HOST).iter();
-    let first_host = host_headers.next().ok_or(Error::MissingHostHeader)?;
+    let first_host = host_headers.next().ok_or(Error::MissingHost)?;
     if host_headers.next().is_some() {
         return Err(Error::MultipleHostHeader);
     }
     let host_str = first_host
         .to_str()
-        .map_err(|_| Error::InvalidHostHeader)?
+        .map_err(|_| Error::InvalidHost)?
         .trim()
         .trim_matches('"')
         .to_string();
