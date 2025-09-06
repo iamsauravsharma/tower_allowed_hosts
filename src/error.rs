@@ -7,13 +7,17 @@ pub enum Error {
     /// error when passed forwarded header is invalid
     InvalidForwardedHeader,
     /// error when passed host header is invalid
-    InvalidHostHeader,
+    InvalidHost,
     /// error when passed host header is missing
-    MissingHostHeader,
+    MissingHost,
     /// error when there is multiple host header
     MultipleHostHeader,
     /// error when uri is missing along with host header
     MissingAuthority,
+    /// error raised when :authority value and host header mismatch
+    MismatchAuthorityHost,
+    /// error raised for future http which may not be supported
+    UnsupportedHttpVersion,
 }
 
 impl std::fmt::Display for Error {
@@ -21,10 +25,16 @@ impl std::fmt::Display for Error {
         match &self {
             Self::HostNotAllowed(host) => write!(f, "host {host} not allowed"),
             Self::InvalidForwardedHeader => write!(f, "invalid forwarded header"),
-            Self::InvalidHostHeader => write!(f, "invalid host header"),
-            Self::MissingHostHeader => write!(f, "missing host header"),
+            Self::InvalidHost => write!(f, "invalid host"),
+            Self::MissingHost => write!(f, "missing host"),
             Self::MultipleHostHeader => write!(f, "multiple host header"),
             Self::MissingAuthority => write!(f, "missing :authority pseudo header"),
+            Self::MismatchAuthorityHost => {
+                write!(f, ":authority pseudo header and host header is mismatched")
+            }
+            Self::UnsupportedHttpVersion => {
+                write!(f, "unsupported http version")
+            }
         }
     }
 }
