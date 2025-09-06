@@ -14,7 +14,7 @@ In your `Cargo.toml` file, add `tower_allowed_hosts` as a dependency:
 
 ```toml
 [dependencies]
-tower_allowed_hosts = "0.11.0"
+tower_allowed_hosts = "0.12.0"
 ```
 
 # Usage
@@ -33,7 +33,7 @@ If you need wildcard-based host matching, enable the `wildcard` feature in your 
 
 ```toml
 [dependencies]
-tower_allowed_hosts = { version = "0.11.0", features = ["wildcard"] }
+tower_allowed_hosts = { version = "0.12.0", features = ["wildcard"] }
 ```
 
 You can then restrict hosts using wildcards:
@@ -48,7 +48,7 @@ If you need regex-based host matching, enable the `regex` feature in your `Cargo
 
 ```toml
 [dependencies]
-tower_allowed_hosts = { version = "0.11.0", features = ["regex"] }
+tower_allowed_hosts = { version = "0.12.0", features = ["regex"] }
 ```
 
 You can then restrict hosts using regex patterns:
