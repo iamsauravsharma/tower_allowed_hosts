@@ -98,8 +98,9 @@ async fn handle_box_error(err: tower::BoxError) -> (StatusCode, String) {
 }
 ```
 
-There is also extension added after successfully parsing allowed host and allowing host which can be access using
-`tower_allowed_hosts::Host` struct Extension
+Extension is automatically added after successfully parsing allowed host and allowing host which can be access using
+`tower_allowed_hosts::Host` struct extractor or extension
+`Extension<Host>`. Only when `axum` feature is enabled you can use `Host` extractor directly. Otherwise, only `Extension<Host>` is only valid extractor to extract host
 
 [license_badge]: https://img.shields.io/github/license/iamsauravsharma/tower_allowed_hosts.svg?style=for-the-badge
 [license_link]: LICENSE
