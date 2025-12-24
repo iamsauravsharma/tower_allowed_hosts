@@ -40,3 +40,26 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+/// Enum representing host rejection
+#[cfg(feature = "axum")]
+#[non_exhaustive]
+pub enum HostRejection {
+    /// Layer is not initialized properly
+    LayerNotInitialized,
+}
+
+#[cfg(feature = "axum")]
+impl axum::response::IntoResponse for HostRejection {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            HostRejection::LayerNotInitialized => {
+                (
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Layer not initialized",
+                )
+                    .into_response()
+            }
+        }
+    }
+}
