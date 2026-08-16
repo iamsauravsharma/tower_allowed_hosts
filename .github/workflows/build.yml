@@ -34,9 +34,8 @@ jobs:
         with:
           toolchain: ${{ matrix.rust-version }}
           components: rustfmt, clippy
-      - name: Install cargo make
-        uses: davidB/rust-cargo-make@v1
-      - name: Run tests
+      - name: Install just
+        uses: extractions/setup-just@v3
+      - name: Run all tasks
         run: |
-          cargo make full
-          cargo make --env FEATURES_FLAG="--all-features" full
+          just all
