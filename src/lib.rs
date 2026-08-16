@@ -37,7 +37,7 @@ mod tests;
 /// This struct is added as a extension to request after successfully resolving
 /// host and verifying host is valid host which can be used in server if needed
 /// for further uses
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Host(pub String);
 
 #[cfg(feature = "axum")]
@@ -47,15 +47,16 @@ where
 {
     type Rejection = HostRejection;
 
-    async fn from_request_parts(
+    fn from_request_parts(
         parts: &mut http::request::Parts,
         _state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        let host = parts
-            .extensions
-            .get::<Host>()
-            .ok_or(HostRejection::LayerNotInitialized)?
-            .clone();
-        Ok(host)
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        std::future::ready(
+            parts
+                .extensions
+                .get::<Host>()
+                .cloned()
+                .ok_or(HostRejection::LayerNotInitialized),
+        )
     }
 }
