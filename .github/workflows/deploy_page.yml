@@ -16,11 +16,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup rust toolchain
         uses: dtolnay/rust-toolchain@nightly
-      - name: Install cargo make
-        uses: davidB/rust-cargo-make@v1
+      - name: Install just
+        uses: extractions/setup-just@v3
       - name: Generate documentation
         run: |
-          cargo make rustdoc
+          just rustdoc
       - name: Generate index page
         run: |
           echo "<meta http-equiv=refresh content=0;url=tower_allowed_hosts/index.html>" > target/doc/index.html
