@@ -18,24 +18,30 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// This layer inspects the request authority/host and compares it against
 /// the configured list of allowed hosts. The authority is determined
 /// according to HTTP specifications, with optional support for trusted
-/// `Forwarded` headers.
+/// `Forwarded` headers. Requests whose host cannot be resolved or is not
+/// allowed are rejected without ever reaching the inner service.
 ///
 /// ## Host resolution priority
 ///
 /// 1. If `forwarded_matcher` is configured and matches, the `host` parameter
-///    from the `Forwarded` header is used as the effective host.   This applies
+///    from the `Forwarded` header is used as the effective host. This applies
 ///    to **all HTTP versions**.
 /// 2. Otherwise, host resolution falls back to protocol-specific rules:
 ///    - For **HTTP/2 and HTTP/3**:
 ///      - The `:authority` pseudo-header (via `req.uri().authority()`) is the
 ///        canonical source.
-///      - If a `Host` header is present, it must match `:authority` or the
-///        request will be rejected.
+///      - If a `Host` header is present, it must match `:authority` (compared
+///        case-insensitively) or the request will be rejected.
 ///      - If `:authority` is missing, the request is rejected.
 ///    - For **HTTP/1.x and older**:
-///      - The `Host` header is used.
-///      - If the `Host` header is missing, the request is rejected (invalid per
-///        RFC 9112 §3.2).
+///      - If the request target is in absolute form, its authority is used (RFC
+///        9112 §3.2.2). The `Host` header must match it (compared
+///        case-insensitively) or the request will be rejected; for HTTP/1.1 the
+///        `Host` header is required even in absolute form (RFC 9112 §3.2),
+///        while for HTTP/1.0 and earlier it may be absent.
+///      - Otherwise the `Host` header is used.
+///      - If the `Host` header is missing, invalid, or appears multiple times,
+///        the request is rejected (invalid per RFC 9112 §3.2).
 ///
 /// ## Forwarded header usage
 ///
@@ -55,6 +61,10 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// With `forwarded_matcher = ("signature", "random_value")`, the extracted
 /// host will be `127.0.0.1`. Other entries are ignored.
 ///
+/// When no forwarded matcher is configured (i.e. it is `()` or another
+/// matcher that can never match), `Forwarded` headers are not parsed at all,
+/// so malformed `Forwarded` headers cannot cause a rejection.
+///
 /// ## ⚠️ Security warning
 ///
 /// The `Forwarded` header can be spoofed by clients unless it is **sanitized
@@ -70,8 +80,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// ```rust
 /// let layer = tower_allowed_hosts::AllowedHostLayer::new("example.com");
 /// ```
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AllowedHostLayer<H, F> {
     host_matcher: H,
     forwarded_matcher: F,
@@ -90,11 +99,8 @@ impl<H> AllowedHostLayer<H, ()> {
             forwarded_matcher: (),
         }
     }
-}
 
-impl<H> AllowedHostLayer<H, ()> {
     /// Extend a host matcher with provided forwarded matcher
-    ///
     ///
     /// # Example
     /// ```
@@ -129,7 +135,7 @@ where
 
 /// Allowed hosts service that wraps the inner service and validates the request
 /// host.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AllowedHost<H, F, S> {
     inner: S,
     layer: AllowedHostLayer<H, F>,
@@ -151,25 +157,30 @@ where
     }
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
-        match get_host(&req, &self.layer.forwarded_matcher) {
-            Ok(host_val) => {
-                let host_allowed = self.layer.host_matcher.matches_value(host_val.as_str());
+        let resolved_host = get_host(&req, &self.layer.forwarded_matcher).and_then(|host| {
+            if self.layer.host_matcher.matches_value(host.as_str()) {
+                Ok(host)
+            } else {
+                Err(Error::HostNotAllowed(host))
+            }
+        });
 
-                if host_allowed {
-                    req.extensions_mut().insert(Host(host_val.clone()));
-                }
-
+        match resolved_host {
+            Ok(host) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("allowed host: {host}");
+                req.extensions_mut().insert(Host(host));
                 Self::Future {
-                    response_future: self.inner.call(req),
-                    host: Ok(host_val),
-                    host_allowed,
+                    state: FutureState::Allowed {
+                        future: self.inner.call(req),
+                    },
                 }
             }
-            Err(err) => {
+            Err(error) => {
+                #[cfg(feature = "tracing")]
+                tracing::debug!("request rejected: {error}");
                 Self::Future {
-                    response_future: self.inner.call(req),
-                    host: Err(err),
-                    host_allowed: false,
+                    state: FutureState::Rejected { error },
                 }
             }
         }
@@ -177,12 +188,25 @@ where
 }
 
 /// Future for `AllowedHost` service.
+///
+/// Resolves with the inner service response when the host is allowed,
+/// otherwise resolves immediately with an error. The inner service is never
+/// invoked for rejected requests.
 #[pin_project::pin_project]
 pub struct AllowedHostFuture<F> {
     #[pin]
-    response_future: F,
-    host: Result<String, Error>,
-    host_allowed: bool,
+    state: FutureState<F>,
+}
+
+#[pin_project::pin_project(project = FutureStateProj)]
+enum FutureState<F> {
+    Allowed {
+        #[pin]
+        future: F,
+    },
+    Rejected {
+        error: Error,
+    },
 }
 
 impl<F, Response, E> Future for AllowedHostFuture<F>
@@ -193,25 +217,9 @@ where
     type Output = Result<Response, BoxError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        match (&this.host, &this.host_allowed) {
-            (Ok(allowed_host), true) => {
-                match this.response_future.poll(cx) {
-                    Poll::Ready(result) => {
-                        #[cfg(feature = "tracing")]
-                        tracing::debug!("allowed host: {}", allowed_host);
-                        Poll::Ready(result.map_err(Into::into))
-                    }
-                    Poll::Pending => Poll::Pending,
-                }
-            }
-            (Ok(blocked_host), false) => {
-                #[cfg(feature = "tracing")]
-                tracing::debug!("blocked host: {}", blocked_host);
-                Poll::Ready(Err(Error::HostNotAllowed(blocked_host.clone()).into()))
-            }
-            (Err(err), _) => Poll::Ready(Err(err.clone().into())),
+        match self.project().state.project() {
+            FutureStateProj::Allowed { future } => future.poll(cx).map_err(Into::into),
+            FutureStateProj::Rejected { error } => Poll::Ready(Err(error.clone().into())),
         }
     }
 }
@@ -228,28 +236,48 @@ where
     }
 
     match req.version() {
-        // HTTP/2 and HTTP/3 use the :authority pseudo-header
+        // HTTP/2 and HTTP/3 use the :authority pseudo-header; Host is optional
         Version::HTTP_2 | Version::HTTP_3 => {
+            let Some(authority) = req.uri().authority() else {
+                return Err(Error::MissingAuthority);
+            };
+            check_host_matches_authority(headers, authority.as_str(), false)?;
+            Ok(authority.to_string())
+        }
+        // HTTP/1.1 and earlier: absolute-form request target takes precedence
+        // over the Host header (RFC 9112 §3.2.2), otherwise Host is used. The
+        // Host header is mandatory for HTTP/1.1 (RFC 9112 §3.2), optional for
+        // HTTP/1.0 and earlier
+        Version::HTTP_11 | Version::HTTP_10 | Version::HTTP_09 => {
             if let Some(authority) = req.uri().authority() {
-                // :authority must be used, Host (if present) must match.
-                if let Ok(host) = extract_from_host(headers)
-                    && host != authority.as_str()
-                {
-                    return Err(Error::MismatchAuthorityHost);
-                }
+                let host_required = req.version() == Version::HTTP_11;
+                check_host_matches_authority(headers, authority.as_str(), host_required)?;
                 return Ok(authority.to_string());
             }
-            Err(Error::MissingAuthority)
-        }
-        // HTTP/1.1 and earlier: must use the Host header
-        Version::HTTP_11 | Version::HTTP_10 | Version::HTTP_09 => {
-            if let Ok(host) = extract_from_host(headers) {
-                return Ok(host);
-            }
-            Err(Error::MissingHost)
+            extract_from_host(headers)
         }
         // Future-proof fallback
         _ => Err(Error::UnsupportedHttpVersion),
+    }
+}
+
+/// Check that the `Host` header agrees with the request target authority
+/// (compared case-insensitively).
+fn check_host_matches_authority(
+    headers: &HeaderMap,
+    authority: &str,
+    host_required: bool,
+) -> Result<(), Error> {
+    match extract_from_host(headers) {
+        Ok(host) => {
+            if host.eq_ignore_ascii_case(authority) {
+                Ok(())
+            } else {
+                Err(Error::MismatchAuthorityHost)
+            }
+        }
+        Err(Error::MissingHost) if !host_required => Ok(()),
+        Err(err) => Err(err),
     }
 }
 
@@ -264,7 +292,6 @@ fn extract_from_host(headers: &HeaderMap) -> Result<String, Error> {
         .to_str()
         .map_err(|_| Error::InvalidHost)?
         .trim()
-        .trim_matches('"')
         .to_string();
     Ok(host_str)
 }
@@ -278,14 +305,20 @@ fn extract_from_forwarded<F>(
 where
     F: KeyValueMatcher,
 {
+    // do not parse (and possibly reject) Forwarded headers which would never
+    // be trusted anyway
+    if forwarded_matcher.never_matches() {
+        return Ok(None);
+    }
     for forwarded_header in headers.get_all(FORWARDED) {
-        let header_str = String::from_utf8(forwarded_header.as_bytes().to_vec())
+        let header_str = forwarded_header
+            .to_str()
             .map_err(|_| Error::InvalidForwardedHeader)?;
-        for header_entry in header_str.split(',') {
-            let (host_value, token_present) = parse_forwarded_entry(header_entry)?;
+        for header_entry in split_outside_quotes(header_str, ',') {
+            let (host_value, token_map) = parse_forwarded_entry(header_entry)?;
 
             if let Some(host) = host_value
-                && forwarded_matcher.matches_key_value(&token_present)
+                && forwarded_matcher.matches_key_value(&token_map)
             {
                 return Ok(Some(host));
             }
@@ -299,7 +332,7 @@ fn parse_forwarded_entry(entry: &str) -> Result<(Option<String>, HashMap<String,
     let mut host_value = None;
     let mut token_map = HashMap::new();
 
-    for part in entry.split(';') {
+    for part in split_outside_quotes(entry, ';') {
         let part = part.trim();
         if part.is_empty() {
             continue;
@@ -308,7 +341,7 @@ fn parse_forwarded_entry(entry: &str) -> Result<(Option<String>, HashMap<String,
         let (key, value) = part.split_once('=').ok_or(Error::InvalidForwardedHeader)?;
 
         let key = key.trim().to_lowercase();
-        let value = value.trim().trim_matches('"').to_string();
+        let value = unquote_forwarded_value(value.trim())?;
 
         if key.as_str() == "host" {
             host_value = Some(value.clone());
@@ -317,4 +350,84 @@ fn parse_forwarded_entry(entry: &str) -> Result<(Option<String>, HashMap<String,
     }
 
     Ok((host_value, token_map))
+}
+
+/// Split on `delimiter` occurrences that are outside RFC 7239 quoted-strings,
+/// so quoted values containing `,` or `;` do not shift parameter boundaries
+fn split_outside_quotes(value: &str, delimiter: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let mut in_quotes = false;
+    let mut escaped = false;
+    for (index, ch) in value.char_indices() {
+        if escaped {
+            escaped = false;
+        } else if in_quotes && ch == '\\' {
+            escaped = true;
+        } else if ch == '"' {
+            in_quotes = !in_quotes;
+        } else if ch == delimiter && !in_quotes {
+            parts.push(&value[start..index]);
+            start = index + 1;
+        }
+    }
+    parts.push(&value[start..]);
+    parts
+}
+
+/// Resolve an RFC 7239 parameter value: quoted-strings are unquoted with
+/// `\`-escapes processed, unquoted tokens are returned as-is
+fn unquote_forwarded_value(value: &str) -> Result<String, Error> {
+    let Some(quoted) = value.strip_prefix('"') else {
+        if value.contains('"') {
+            return Err(Error::InvalidForwardedHeader);
+        }
+        return Ok(value.to_string());
+    };
+    let inner = quoted
+        .strip_suffix('"')
+        .ok_or(Error::InvalidForwardedHeader)?;
+    let mut unescaped = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' => unescaped.push(chars.next().ok_or(Error::InvalidForwardedHeader)?),
+            '"' => return Err(Error::InvalidForwardedHeader),
+            _ => unescaped.push(ch),
+        }
+    }
+    Ok(unescaped)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{split_outside_quotes, unquote_forwarded_value};
+
+    #[test]
+    fn split_respects_quotes() {
+        assert_eq!(split_outside_quotes("a=1;b=2", ';'), vec!["a=1", "b=2"]);
+        assert_eq!(
+            split_outside_quotes(r#"a="1;2";b=3"#, ';'),
+            vec![r#"a="1;2""#, "b=3"]
+        );
+        assert_eq!(
+            split_outside_quotes(r#"a="1,2",b=3"#, ','),
+            vec![r#"a="1,2""#, "b=3"]
+        );
+        assert_eq!(
+            split_outside_quotes(r#"a="1\";2";b=3"#, ';'),
+            vec![r#"a="1\";2""#, "b=3"]
+        );
+    }
+
+    #[test]
+    fn unquote_values() {
+        assert_eq!(unquote_forwarded_value("plain").unwrap(), "plain");
+        assert_eq!(unquote_forwarded_value(r#""quoted""#).unwrap(), "quoted");
+        assert_eq!(unquote_forwarded_value(r#""""#).unwrap(), "");
+        assert_eq!(unquote_forwarded_value(r#""a\"b""#).unwrap(), "a\"b");
+        assert!(unquote_forwarded_value(r#""unterminated"#).is_err());
+        assert!(unquote_forwarded_value(r#"stray"quote"#).is_err());
+        assert!(unquote_forwarded_value(r#""bad"inner""#).is_err());
+    }
 }

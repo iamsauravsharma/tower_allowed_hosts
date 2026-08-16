@@ -12,7 +12,7 @@ pub enum Error {
     MissingHost,
     /// error when there is multiple host header
     MultipleHostHeader,
-    /// error when uri is missing along with host header
+    /// error when :authority pseudo header is missing (HTTP/2 and HTTP/3)
     MissingAuthority,
     /// error raised when :authority value and host header mismatch
     MismatchAuthorityHost,
@@ -43,6 +43,7 @@ impl std::error::Error for Error {}
 
 /// Enum representing host rejection
 #[cfg(feature = "axum")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum HostRejection {
     /// Layer is not initialized properly

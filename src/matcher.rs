@@ -26,10 +26,20 @@ pub trait Matcher {
 pub trait KeyValueMatcher {
     /// Checks if provided value matches according to matcher
     fn matches_key_value(&self, values: &HashMap<String, String>) -> bool;
+
+    /// Returns `true` when this matcher can never match any input
+    ///
+    /// [`AllowedHostLayer`](crate::AllowedHostLayer) uses this as a hint to
+    /// skip parsing `Forwarded` headers entirely, so a request is never
+    /// rejected because of a malformed `Forwarded` header which would not
+    /// have been trusted anyway
+    fn never_matches(&self) -> bool {
+        false
+    }
 }
 
 /// Any matcher which always returns true and matches any host
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct Any;
 
 impl Matcher for Any {
@@ -45,6 +55,7 @@ impl KeyValueMatcher for Any {
 }
 
 /// And matcher which matches only when both left and right matches
+#[derive(Clone, Copy, Debug)]
 pub struct And<L, R> {
     left: L,
     right: R,
@@ -75,9 +86,14 @@ where
     fn matches_key_value(&self, values: &HashMap<String, String>) -> bool {
         self.left.matches_key_value(values) && self.right.matches_key_value(values)
     }
+
+    fn never_matches(&self) -> bool {
+        self.left.never_matches() || self.right.never_matches()
+    }
 }
 
 /// Or matcher which matches when either left and right matches
+#[derive(Clone, Copy, Debug)]
 pub struct Or<L, R> {
     left: L,
     right: R,
@@ -97,6 +113,10 @@ where
 {
     fn matches_key_value(&self, values: &HashMap<String, String>) -> bool {
         self.left.matches_key_value(values) || self.right.matches_key_value(values)
+    }
+
+    fn never_matches(&self) -> bool {
+        self.left.never_matches() && self.right.never_matches()
     }
 }
 
@@ -131,6 +151,10 @@ impl Matcher for () {
 impl KeyValueMatcher for () {
     fn matches_key_value(&self, _values: &HashMap<String, String>) -> bool {
         false
+    }
+
+    fn never_matches(&self) -> bool {
+        true
     }
 }
 
@@ -174,6 +198,10 @@ where
             false
         }
     }
+
+    fn never_matches(&self) -> bool {
+        self.as_ref().is_none_or(M::never_matches)
+    }
 }
 
 impl<M> Matcher for Box<M>
@@ -192,6 +220,10 @@ where
     fn matches_key_value(&self, values: &HashMap<String, String>) -> bool {
         (**self).matches_key_value(values)
     }
+
+    fn never_matches(&self) -> bool {
+        (**self).never_matches()
+    }
 }
 
 impl<M> Matcher for &M
@@ -209,6 +241,10 @@ where
 {
     fn matches_key_value(&self, values: &HashMap<String, String>) -> bool {
         (**self).matches_key_value(values)
+    }
+
+    fn never_matches(&self) -> bool {
+        (**self).never_matches()
     }
 }
 
